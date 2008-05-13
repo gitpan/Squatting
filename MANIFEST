@@ -1,0 +1,23 @@
+bin/squatting
+bugs.yaml
+edit
+eg/Example.pm
+eg/Example/Controllers.pm
+eg/Example/Views.pm
+eg/PODServer.pm
+eg/README
+etc/init.d/squatting-debian
+etc/init.d/squatting-gentoo
+etc/init.d/squatting-ubuntu
+lib/Squatting.pm
+lib/Squatting/Controller.pm
+lib/Squatting/Mapper.pm
+lib/Squatting/Q.pm
+lib/Squatting/View.pm
+Makefile.PL
+MANIFEST			This list of files
+MANIFEST.SKIP
+MIT-LICENSE
+README
+t/00_basic.t
+META.yml                                 Module meta-data (added by MakeMaker)
