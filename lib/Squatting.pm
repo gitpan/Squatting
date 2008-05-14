@@ -10,7 +10,7 @@ use List::Util qw(first);
 use Continuity;
 use Squatting::Mapper;
 
-our $VERSION     = '0.20';
+our $VERSION     = '0.21';
 our @EXPORT_OK   = qw($app C R V);
 our %EXPORT_TAGS = (
   controllers => [qw($app C R)],
@@ -315,7 +315,7 @@ manipulate an object's prototype chain.  The beauty of prototypes is that this
 one concept can be used to unify objects, classes, and namespaces.  Look at Io
 if you don't believe me.
 
-  http://io-language.org/
+  http://iolanguage.com/
 
 =head1 AUTHOR
 
