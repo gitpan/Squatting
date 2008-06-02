@@ -1,5 +1,7 @@
 bin/squatting
+bin/vw
 bugs.yaml
+Changes
 edit
 eg/Example.pm
 eg/Example/Controllers.pm

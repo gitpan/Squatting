@@ -57,8 +57,8 @@ if ($_{version}) {
 }
 
 my $app = shift;
-$app =~ s/\.pmc?$//;
 if ($app) {
+  $app =~ s/\.pmc?$//;
   my $path = $app;
   $path =~ s{::}{/}g;
   $path .= ".pm";
@@ -76,7 +76,6 @@ if ($app) {
       $self->{env}         = { %ENV, REQUEST_PATH => Squatting::R($self->name, @_) };
       $self->{cookies}     = {};
       $self->{input}       = {};
-      $self->{set_cookies} = {};
       $self->{headers}     = {};
       $self->{v}           = {};
       $self->{status}      = 200;
