@@ -53,17 +53,21 @@ web app.
 
 L<Attribute::Handlers>,
 L<Coro>,
-L<Squatting::Tutorial>
+L<Squatting::Mapper>,
+L<Squatting::Controller>
+
+=for html
+<object width="425" height="344"><param name="movie" value="http://www.youtube.com/v/Oh2_0ItwT5U&hl=en&color1=0xe1600f&color2=0xfebd01"></param><embed src="http://www.youtube.com/v/Oh2_0ItwT5U&hl=en&color1=0xe1600f&color2=0xfebd01" type="application/x-shockwave-flash" width="425" height="344"></embed></object>
 
 =cut
 
 # Local Variables: ***
 # mode: cperl ***
-# indent-tabs-mode: t ***
+# indent-tabs-mode: f ***
 # cperl-close-paren-offset: -2 ***
 # cperl-continued-statement-offset: 2 ***
 # cperl-indent-level: 2 ***
 # cperl-indent-parens-as-block: t ***
 # cperl-tab-always-indent: f ***
 # End: ***
-# vim:tabstop=2 softtabstop=2 shiftwidth=2 shiftround expandtab
+# vim:tabstop=8 softtabstop=2 shiftwidth=2 shiftround expandtab

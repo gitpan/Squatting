@@ -97,19 +97,18 @@ sub e {
 sub i {
   my $q = CGI->new($_[0]);
   my %i = $q->Vars;
-  my %input = map {
+  +{ map {
     if ($i{$_} =~ /\0/) {
       $_ => [ split("\0", $i{$_}) ];
     } else {
       $_ => $i{$_};
     }
-  } keys %i;
-  \%input;
+  } keys %i }
 }
 
 # \%cookies = c($cookie_header)  # Parse Cookie header(s).
 sub c {
-  { CGI::Cookie->parse($_[0]) };
+  +{ map { ref($_) ? $_->value : $_ } CGI::Cookie->parse($_[0]) };
 }
 
 # default 404 controller
@@ -267,11 +266,11 @@ L<Squatting::Q>
 
 # Local Variables: ***
 # mode: cperl ***
-# indent-tabs-mode: t ***
+# indent-tabs-mode: f ***
 # cperl-close-paren-offset: -2 ***
 # cperl-continued-statement-offset: 2 ***
 # cperl-indent-level: 2 ***
 # cperl-indent-parens-as-block: t ***
 # cperl-tab-always-indent: f ***
 # End: ***
-# vim:tabstop=2 softtabstop=2 shiftwidth=2 shiftround expandtab
+# vim:tabstop=8 softtabstop=2 shiftwidth=2 shiftround expandtab

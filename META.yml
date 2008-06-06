@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Squatting
-version:             0.30
+version:             0.31
 abstract:            A Camping-inspired Web Microframework for Perl
 license:             mit
 generated_by:        ExtUtils::MakeMaker version 6.36
@@ -17,5 +17,6 @@ meta-spec:
 author:
     - John BEPPU <beppu@cpan.org>
 no_index:
-    - eg
-    - t
+    directory:
+        - eg
+        - t

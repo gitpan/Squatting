@@ -1,3 +1,6 @@
+0.31
+  - Fixed a bug in the cookie parsing code.
+
 0.30
   - In view objects, $self->{template} is the name of the current template.
   - $controller->set_cookies renamed to $controller->cookies

@@ -13,19 +13,16 @@ use URI::Escape;
 use Carp;
 use Data::Dump 'pp';
 
-our $VERSION     = '0.30';
+our $VERSION     = '0.31';
 our @EXPORT_OK   = qw($app C R V);
 our %EXPORT_TAGS = (
   controllers => [qw($app C R)],
   views       => [qw($app R V)]
 );
 
-# Kill the following package vars,
+# Kill the following package vars (especially $app),
 # and we might have a chance of working under mod_perl.
-# However, I think reverse proxies 
-# (like nginx, perlbal, apache 2's mod_proxy_balancer, etc.)
-# are the way to go.
-our $app;
+our $app; 
 our $I = 0;
 our %Q;
 
@@ -81,7 +78,7 @@ sub R {
   $pattern;
 }
 
-# $view = V($name, %subs)  # Construct a Squatting::View
+# $view = V($name, %subs)  # shortcut for constructing a Squatting::View
 sub V {
   Squatting::View->new(@_);
 }
@@ -446,11 +443,11 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 # Local Variables: ***
 # mode: cperl ***
-# indent-tabs-mode: t ***
+# indent-tabs-mode: f ***
 # cperl-close-paren-offset: -2 ***
 # cperl-continued-statement-offset: 2 ***
 # cperl-indent-level: 2 ***
 # cperl-indent-parens-as-block: t ***
 # cperl-tab-always-indent: f ***
 # End: ***
-# vim:tabstop=2 softtabstop=2 shiftwidth=2 shiftround expandtab
+# vim:tabstop=8 softtabstop=2 shiftwidth=2 shiftround expandtab

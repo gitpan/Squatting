@@ -18,8 +18,9 @@ our %perl_modules;
 our @perl_modules;
 sub scan {
   for (@INC) {
+    next if $_ eq ".";
     my $inc = $_;
-    my $wanted = sub {
+    my $pm_or_pod = sub {
       my $m = $File::Find::name;
       next if -d $m;
       next unless /\.(pm|pod)$/;
@@ -28,12 +29,25 @@ sub scan {
       $m =~ s{^/}{};
       $perl_modules{$m} = $File::Find::name;
     };
-    find($wanted, $_);
+    find({ wanted => $pm_or_pod, follow_fast => 1 }, $_);
   }
   my %h = map { $_ => 1 } ( keys %perl_modules, keys %perl_basepods );
   @perl_modules = sort keys %h;
 }
 scan;
+
+# *.pod takes precedence over *.pm
+sub pod_for {
+  for ($_[0]) {
+    return $_ if /\.pod$/;
+    my $pod = $_;
+    $pod =~ s/\.pm$/\.pod/;
+    if (-e $pod) {
+      return $pod;
+    }
+    return $_;
+  }
+}
 
 our @C = (
 
@@ -42,7 +56,19 @@ our @C = (
     get  => sub {
       my ($self) = @_;
       $self->v->{title} = 'POD Server';
+      if ($self->input->{base}) {
+        $self->v->{base} = 'pod';
+      }
       $self->render('home');
+    }
+  ),
+
+  C(
+    Frames => [ '/frames' ],
+    get    => sub {
+      my ($self) = @_;
+      $self->v->{title} = 'POD Server';
+      $self->render('_frames');
     }
   ),
 
@@ -54,15 +80,16 @@ our @C = (
     get => sub {
       my ($self, $module) = @_;
       my $v        = $self->v;
+      my $pm       = $module; $pm =~ s{/}{::}g;
       $v->{path}   = [ split('/', $module) ];
       $v->{module} = $module;
       if (exists $perl_modules{$module}) {
-        $v->{pod_file} = $perl_modules{$module};
-        $v->{title} = "POD Server - $module";
+        $v->{pod_file} = pod_for $perl_modules{$module};
+        $v->{title} = "POD Server - $pm";
         $self->render('pod');
       } elsif (exists $perl_basepods{$module}) {
-        $v->{pod_file} = $perl_basepods{$module};
-        $v->{title} = "POD Server - $module";
+        $v->{pod_file} = pod_for $perl_basepods{$module};
+        $v->{title} = "POD Server - $pm";
         $self->render('pod');
       } else {
         $v->{title} = "POD Server - $v->{module}";
@@ -97,10 +124,17 @@ our @V = (
       html(
         head(
           title($v->{title}),
-          style(x($self->_css))
+          style(x($self->_css)),
+          (
+            $v->{base} 
+              ? base({ target => $v->{base} })
+              : ()
+          ),
         ),
         body(
-          div({ id => 'menu' }, a({ href => R('Home')}, "Home"), ($self->_breadcrumbs($v)) ),
+          div({ id => 'menu' },
+            a({ href => R('Home')}, "Home"), ($self->_breadcrumbs($v))
+          ),
           div({ id => 'pod' }, @content),
         ),
       )->as_HTML;
@@ -147,6 +181,10 @@ our @V = (
           color: #fff;
           opacity: 0.75;
         }
+        ul#list {
+          margin-left: -6em;
+          list-style: none;
+        }
         div#pod {
           width: 540px;
           margin: 2em 4em 2em 4em;
@@ -171,20 +209,34 @@ our @V = (
       |;
     },
 
-    _js => sub {
-      $JS ||= join('', <DATA>);
+    home => sub {
+      $HOME ||= div(
+        a({ href => R(Home),   target => '_top' }, "no frames"),
+        em(" | "),
+        a({ href => R(Frames), target => '_top' }, "frames"),
+        ul({ id => 'list' },
+          map {
+            my $pm = $_;
+            $pm =~ s{/}{::}g;
+            li(
+              a({ href => R('Pod', $_) }, $pm )
+            )
+          } (sort @perl_modules)
+        )
+      );
     },
 
-    home => sub {
-      $HOME ||= ul(
-        map {
-          my $pm = $_;
-          $pm =~ s{/}{::}g;
-          li(
-            a({ href => R(Pod, $_) }, $pm )
-          )
-        } (sort @perl_modules)
-      );
+    _frames => sub {
+      my ($self, $v) = @_;
+      html(
+        head(
+          title($v->{title})
+        ),
+        frameset({ cols => '*,380' },
+          frame({ name => 'pod',  src => R('Pod', 'Squatting') }),
+          frame({ name => 'list', src => R('Home', { base => 'pod' }) }),
+        ),
+      )->as_HTML;
     },
 
     pod => sub {
@@ -216,7 +268,7 @@ our @V = (
       ul(
         map {
           li(
-            a({ href => R(Pod, $_) }, $colon->($_))
+            a({ href => R('Pod', $_) }, $colon->($_))
           )
         } @possibilities
       );
