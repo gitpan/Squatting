@@ -3,18 +3,24 @@ bin/vw
 bugs.yaml
 Changes
 edit
+eg/chat-ajax-push.js
+eg/Chat.pm
 eg/Example.pm
 eg/Example/Controllers.pm
 eg/Example/Views.pm
+eg/jquery.js
 eg/PODServer.pm
 eg/README
+eg/UniCodePoints.pm
 etc/init.d/squatting-debian
 etc/init.d/squatting-gentoo
 etc/init.d/squatting-ubuntu
 lib/Squatting.pm
 lib/Squatting/Controller.pm
+lib/Squatting/Cookbook.pod
 lib/Squatting/Mapper.pm
-lib/Squatting/Q.pm
+lib/Squatting/On/Catalyst.pm
+lib/Squatting/On/Continuity.pm
 lib/Squatting/View.pm
 Makefile.PL
 MANIFEST			This list of files
@@ -22,4 +28,6 @@ MANIFEST.SKIP
 MIT-LICENSE
 README
 t/00_basic.t
+t/01_controller.t
+t/02_view.t
 META.yml                                 Module meta-data (added by MakeMaker)

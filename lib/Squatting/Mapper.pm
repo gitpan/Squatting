@@ -1,20 +1,19 @@
 package Squatting::Mapper;
 
-use strict;
-use warnings;
+#use strict;
+#no  strict 'refs'
+#use warnings;
 use base 'Continuity::Mapper';
-
-use Squatting::Q;
 
 sub get_session_id_from_hit {
   my ($self, $request) = @_;
+  my $app = $self->{app};
   my $session_id = $self->SUPER::get_session_id_from_hit($request);
-  my ($controller, $params) = Squatting::D($request->uri->path);
-  my $method  = lc $request->method;
-  my $coderef = $controller->{$method};
-  my $queue   = $Squatting::Q{$coderef};
+  my ($controller, $params) = &{$app."::D"}($request->uri->path);
+  my $method = lc $request->method;
+  my $queue = $controller->{queue}->{$method};
   if (defined($queue)) {
-    $session_id .= ".$queue";
+    $session_id .= ".$app.$queue";
     $self->Continuity::debug(2, "    Session: got queue '$session_id'");
   }
   $session_id;
@@ -28,16 +27,14 @@ Squatting::Mapper - map requests to session queues
 
 =head1 DESCRIPTION
 
-You'll probably never use this module directly, but just so you know...
 The purpose of this module is to be on the lookout for requests that should
-route to controllers that have used the C<Q> subroutine attribute.
-If it encounters such a request, it gives Continuity a $session_id with
-the queue name appeneded to it.  This will cause Continuity to run this
-request in a different session queue.
+route to controllers that have a C<queue> attribute.  If it encounters such a
+request, it gives Continuity a $session_id with the app name and queue name
+appeneded to it.  This will cause Continuity to run this request in a different
+session queue.
 
 =head1 SEE ALSO
 
-L<Squatting::Q>,
 L<Continuity::Mapper>
 
 =cut

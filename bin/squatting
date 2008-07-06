@@ -6,12 +6,14 @@ use warnings;
 
 use Squatting;
 use Getopt::Long;
+use Data::Dump 'pp';
 
 # defaults
 $_{port}  = 4234;
 $_{debug} = 1;
 
 # command line options
+Getopt::Long::Configure('no_ignore_case');
 GetOptions(
   \%_,
   'port|p=i',
@@ -19,6 +21,8 @@ GetOptions(
   'console|C',
   'debug=i',
   'version|v',
+  'config|c=s%',
+  'show-config|s',
   'logo',
   'h|help',
 );
@@ -30,6 +34,8 @@ Usage: squatting [OPTIONS]... App
 
 Options:
     -p, --port NUM                   Port for web server (defaults to $_{port})
+    -c, --config ATTR=VALUE          Set an app's %CONFIG variables
+    -s, --show-config                Display an app's %CONFIG and exit
     -l, --log FILE                   Log file  # TODO
     -C, --console                    Run in console mode with Shell::Perl
     --debug NUM                      Continuity debug_level (defaults to $_{debug})
@@ -63,6 +69,14 @@ if ($app) {
   $path =~ s{::}{/}g;
   $path .= ".pm";
   require "$path";
+  my $C = \%{$app."::CONFIG"};
+  for (keys %{$_{config}}) {
+    $C->{$_} = $_{config}{$_}
+  }
+  if ($_{'show-config'}) {
+    print pp($C), "\n";
+    exit 0;
+  }
   if ($_{console}) {
     eval { require Shell::Perl };
     if ($@) {
@@ -73,7 +87,7 @@ if ($app) {
     sub Squatting::Controller::mock_init {
       my $self = shift;
       $self->{cr}          = {}; # TODO - provide a mock Continuity::Request
-      $self->{env}         = { %ENV, REQUEST_PATH => Squatting::R($self->name, @_) };
+      $self->{env}         = { %ENV, REQUEST_PATH => &{"$app"."::Controllers::R"}($self->name, @_) };
       $self->{cookies}     = {};
       $self->{input}       = {};
       $self->{headers}     = {};
@@ -93,7 +107,9 @@ if ($app) {
     $pirl->set_package($app."::Controllers");
     $pirl->run;
   } else {
-    $app->go(
+    $app->import("On::Continuity");
+    $app->init;
+    $app->continue(
       port        => $_{port},
       log         => $_{log},
       debug_level => $_{debug},
@@ -142,6 +158,20 @@ Start a Squatting application.
 =item -p, --port NUM
 
 Port for web server (defaults to 4234)
+
+=item -c, --config ATTR=VALUE
+
+The standard way to configure a Squatting application is to manipulate its
+%App::CONFIG hash.  The --config option lets you set values in this
+hash, and you may use --config multiple times in a single command line.
+
+B<Example>:
+
+  squatting App --config doc_root=/www/app.com --config hostname=app.com
+
+=item -s, --show-config
+
+Display an App's %CONFIG hash and exit.
 
 =item -l, --log FILE
 

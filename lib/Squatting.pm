@@ -2,153 +2,172 @@ package Squatting;
 
 use strict;
 no  strict 'refs';
-use warnings;
-use base 'Exporter';
-
-use Continuity;
-use Squatting::Mapper;
+#use warnings;
+#no  warnings 'redefine';
+use base 'Class::C3::Componentised';
 
 use List::Util qw(first);
 use URI::Escape;
 use Carp;
 use Data::Dump 'pp';
 
-our $VERSION     = '0.31';
-our @EXPORT_OK   = qw($app C R V);
-our %EXPORT_TAGS = (
-  controllers => [qw($app C R)],
-  views       => [qw($app R V)]
-);
+our $VERSION = '0.40';
 
-# Kill the following package vars (especially $app),
-# and we might have a chance of working under mod_perl.
-our $app; 
+# TODO - Move $I and the code that uses it out to another (optional) module.
 our $I = 0;
-our %Q;
 
 require Squatting::Controller;
 require Squatting::View;
 
-# $controller = C($name => \@urls, %subs)  # Construct a Squatting::Controller
-sub C {
-  Squatting::Controller->new(@_);
-}
+# use App qw(LIST);
+sub import {
+  my $m   = shift;
+  my $p   = (caller)[0];
+  my $app = $p;
+  $app =~ s/::Controllers$//;
+  $app =~ s/::Views$//;
 
-# ($controller, \@regex_captures) = D($path)  # Return controller and captures for a path
-sub D {
-  no warnings 'once';
-  my $url = uri_unescape($_[0]);
-  my $C = \@{$app.'::Controllers::C'};
-  my ($c, @regex_captures);
-  for $c (@$C) {
-    for (@{$c->urls}) {
-      if (@regex_captures = ($url =~ qr{^$_$})) {
-        pop @regex_captures if ($#+ == 0);
-        return ($c, \@regex_captures);
+  # $url = R('Controller', @params, { cgi => vars })  # Generate URLs with the routing function
+  if (UNIVERSAL::isa($app, 'Squatting')) {
+    *{$p."::R"} = sub {
+      my ($controller, @params) = @_;
+      my $input;
+      if (@params && ref($params[-1]) eq 'HASH') {
+        $input = pop(@params);
       }
+      my $c = ${$app."::Controllers::C"}{$controller};
+      croak "$controller controller not found" unless $c;
+      my $arity = @params;
+      my $pattern = first { my @m = /\(.*?\)/g; $arity == @m } @{$c->urls};
+      croak "couldn't find a matching URL pattern" unless $pattern;
+      while ($pattern =~ /\(.*?\)/) {
+        $pattern =~ s{\(.*?\)}{uri_escape(+shift(@params), "^A-Za-z0-9\-_.!~*’()/")}e;
+      }
+      if ($input) {
+        $pattern .= "?".  join('&' => 
+          map { 
+            my $k = $_;
+            ref($input->{$_}) eq 'ARRAY'
+              ? map { "$k=".uri_escape($_) } @{$input->{$_}}
+              : "$_=".uri_escape($input->{$_})
+          } keys %$input);
+      }
+      $pattern;
+    };
+
+    # ($controller, \@regex_captures) = D($path)  # Return controller and captures for a path
+    *{$app."::D"} = sub {
+      no warnings 'once';
+      my $url = uri_unescape($_[0]);
+      my $C = \@{$app.'::Controllers::C'};
+      my ($c, @regex_captures);
+      for $c (@$C) {
+        for (@{$c->urls}) {
+          if (@regex_captures = ($url =~ qr{^$_$})) {
+            pop @regex_captures if ($#+ == 0);
+            return ($c, \@regex_captures);
+          }
+        }
+      }
+      ($Squatting::Controller::r404, []);
+    } unless exists ${$app."::"}{D};
+  }
+
+  my @c;
+  for (@_) {
+    if ($_ eq ':controllers') {
+      # $controller = C($name => \@urls, %subs)  # shortcut for constructing a Squatting::Controller
+      *{$p."::C"} = sub {
+        Squatting::Controller->new(@_, app => $app);
+      };
+    } elsif ($_ eq ':views') {
+      # $view = V($name, %subs)  # shortcut for constructing a Squatting::View
+      *{$p."::V"} = sub {
+        Squatting::View->new(@_);
+      };
+    } elsif (/::/) {
+      push @c, $_;
     }
   }
-  ($Squatting::Controller::r404, []);
+  $m->load_components(@c) if @c;
 }
 
-# $url = R('Controller', @params, { cgi => vars })  # Generate URLs with the routing function
-sub R {
-  my ($controller, @params) = @_;
-  my $input;
-  if (@params && ref($params[-1]) eq 'HASH') {
-    $input = pop(@params);
-  }
-  my $c = ${$app."::Controllers::C"}{$controller};
-  croak "$controller controller not found" unless $c;
-  my $arity = @params;
-  my $pattern = first { my @m = /\(.*?\)/g; $arity == @m } @{$c->urls};
-  croak "couldn't find a matching URL pattern" unless $pattern;
-  while ($pattern =~ /\(.*?\)/) {
-    $pattern =~ s{\(.*?\)}{uri_escape(+shift(@params), "^A-Za-z0-9\-_.!~*’()/")}e;
-  }
-  if ($input) {
-    $pattern .= "?".  join('&' => 
-      map { 
-        my $k = $_;
-        ref($input->{$_}) eq 'ARRAY'
-          ? map { "$k=".uri_escape($_) } @{$input->{$_}}
-          : "$_=".uri_escape($input->{$_})
-      } keys %$input);
-  }
-  $pattern;
+# Squatting plugins may be anywhere in Squatting::* but by convention
+# (and for fun) you should use poetic diction in your package names.
+#
+# Squatting::On::Continuity
+# Squatting::On::Catalyst
+# Squatting::On::CGI
+# Squatting::On::Jifty 
+#
+# (all your framework are belong to us)
+#
+# Squatting::With::Impunity (What could we do w/ this name?)
+# Squatting::With::Log4Perl (which is how we could add logging support)
+#
+# (etc)
+sub component_base_class { __PACKAGE__ }
+
+# App->mount($AnotherApp, $prefix)  # Map another app on to a URL $prefix.
+sub mount {
+  my ($app, $other, $prefix) = @_;
+  push @{$app."::O"}, $other;
+  push @{$app."::Controllers::C"}, map {
+    my $urls = $_->urls;
+    $_->urls = [ map { $prefix.$_ } @$urls ];
+    $_;
+  } @{$other."::Controllers::C"}
 }
 
-# $view = V($name, %subs)  # shortcut for constructing a Squatting::View
-sub V {
-  Squatting::View->new(@_);
-}
-
-# App->service($controller, @params)  # Override this method if you want to take actions before or after a request is handled.
-sub service {
-  my ($class, $c, @params) = grep { defined } @_;
-  my $method  = lc $c->env->{REQUEST_METHOD};
-  my $content;
-  $I++;
-  eval { $content = $c->$method(@params) };
-  warn "EXCEPTION: $@" if ($@);
-  my $s = $c->status;
-  my $cookies = $c->cookies;
-  my $ppi = (%{$c->input}) 
-    ? ', ' . pp($c->input) 
-    : '';
-  #
-  warn sprintf('%5d ', $I), "[$s] $app->$method(@{[ join(', '=>map { \"'$_'\" } $c->name, @params) ]}$ppi)\n";
-  #
-  $c->headers->{'Set-Cookie'} = join("; ",
-    map { CGI::Cookie->new( -name => $_, %{$cookies->{$_}} ) }
-      grep { ref $cookies->{$_} eq 'HASH' }
-        keys %$cookies) if (%$cookies);
-  if (my $cr_cookies = $c->cr->cookies) {
-    $cr_cookies =~ s/^Set-Cookie: //;
-    $c->headers->{'Set-Cookie'} = join("; ",
-      grep { defined } ($c->headers->{'Set-Cookie'}, $cr_cookies));
+# App->relocate($prefix)  # Map main app to a URL $prefix
+sub relocate {
+  my ($app, $prefix) = @_;
+  for (@{$app."::Controllers::C"}) {
+    my $urls = $_->urls;
+    $_->urls = [ map { $prefix.$_ } @$urls ];
   }
-  return $content;
 }
 
 # App->init  # Initialize $app
 sub init {
-  $app = shift;
-  %{$app."::Controllers::C"} = map { $_->name => $_ }
-  @{$app."::Controllers::C"};
-  %{$app."::Views::V"} = map { $_->name => $_ }
-  @{$app."::Views::V"};
+  $_->init for (@{$_[0]."::O"});
+  %{$_[0]."::Controllers::C"} = map { $_->name => $_ }
+  @{$_[0]."::Controllers::C"};
+  %{$_[0]."::Views::V"} = map { $_->name => $_ }
+  @{$_[0]."::Views::V"};
 }
 
-# App->go(%opts)  # Start the server.
-sub go {
-  $app = shift;
-  $app->init;
-  # Putting a RESTful face on Continuity since 2008.
-  Continuity->new(
-    port     => 4234,
-    mapper   => Squatting::Mapper->new(
-      callback => sub {
-        my $cr = shift;
-        my ($c, $p)  = D($cr->uri->path);
-        my $cc       = $c->clone->init($cr);
-        my $content  = $app->service($cc, @$p);
-        my $response = HTTP::Response->new(
-          $cc->status,
-          HTTP::Status::status_message($cc->status),
-          [%{$cc->{headers}}],
-          $content
-        );
-        $cr->conn->send_response($response);
-        $cr->end_request;
-      },
-      @_
-    ),
-    @_
-  )->loop;
-}
+# App->service($controller, @params)  # Override this method if you want to take actions before or after a request is handled.
+sub service {
+  my ($app, $c, @params) = grep { defined } @_;
+  my $method = lc $c->env->{REQUEST_METHOD};
+  my $content;
 
-$SIG{PIPE} = sub { Coro::terminate(0) };
+  eval { $content = $c->$method(@params) };
+  warn "EXCEPTION: $@" if ($@);
+
+  # TODO - move this code into another (optional) module. {{{
+  $I++;
+  my $s = $c->status;
+  my $ppi = (%{$c->input}) 
+    ? ', ' . pp($c->input) 
+    : '';
+  warn sprintf('%5d ', $I), "[$s] $app->$method(@{[ join(', '=>map { \"'$_'\" } $c->name, @params) ]}$ppi)\n";
+  # }}}
+
+  my $cookies = $c->cookies;
+  $c->headers->{'Set-Cookie'} = join("; ",
+    map { CGI::Cookie->new( -name => $_, %{$cookies->{$_}} ) }
+      grep { ref $cookies->{$_} eq 'HASH' }
+        keys %$cookies) if (%$cookies);
+  # XXX - move this if-block into Squatting::On::Continuity
+  if ($c->cr && (my $cr_cookies = $c->cr->cookies)) {
+    $cr_cookies =~ s/^Set-Cookie: //;
+    $c->headers->{'Set-Cookie'} = join("; ",
+      grep { not /^\s*$/ } ($c->headers->{'Set-Cookie'}, $cr_cookies));
+  }
+  return $content;
+}
 
 1;
 
@@ -175,6 +194,7 @@ What a basic App looks like:
     use base 'Squatting';
     #use App::Controllers;
     #use App::Views;
+    our %CONFIG;  # <-- standard app config goes here
   }
 
   # STEP 2 => Create a Controllers package
@@ -218,14 +238,17 @@ What a basic App looks like:
     );
   }
 
-  # Models?  The whole world is your model.  ;-)
+  # Models?  
+  # - The whole world is your model.  ;-)
   # - I've always been ambivalent about defining policy here.
   # - Use whatever works for you.
 
 =head1 DESCRIPTION
 
-Squatting is a web microframework based on Camping
-that uses L<Continuity> as its foundation.
+Squatting is a web microframework based on Camping.
+It originally used L<Continuity> as its foundation,
+but it has since been generalized such that it can
+squat on top of any Perl-based web framework (in theory).
 
 =head2 What does this mean?
 
@@ -233,12 +256,13 @@ that uses L<Continuity> as its foundation.
 
 =item B<Concise API>
 
-_why did a really good job designing Camping's API, so I copied quite a bit
-of the feel of Camping for Squatting.
+_why did a really good job designing Camping's API so that you could get the
+MOST done with the LEAST amount of code possible.  I loved Camping's API so
+much that I ported it to Perl.
 
 =item B<Tiny Codebase>
 
-Right now, it's around 6.6K of actual code (after minifying), but it can
+Right now, it's around 7.7K (B<*>) of actual code (after minifying), but it can
 definitely get smaller.  Also, the number of Perl module dependencies has been
 kept down to a minimum.
 
@@ -248,29 +272,55 @@ Controllers are objects (not classes) that are made to look like HTTP
 resources.  Thus, they respond to methods like get(), post(), put(), and
 delete().
 
-=item B<RESTless Controllers Are Possible (thanks to Continuity)>
+=item B<RESTless Controllers Are Possible>
 
 Stateful continuation-based code can be surprisingly useful (especially for
-COMET), so we try to make RESTless controllers easy to express as well.
+COMET), so we try to make RESTless controllers easy to express as well. B<**>
 
 =item B<Views Are ...Different>
 
 The View API feels like Camping, but Squatting allows multiple views to coexist
-(kinda like Catalyst (but not quite)).
+(somewhat like Catalyst (but not quite)).
+
+=item B<Squatting Apps Are Composable>
+
+You can take multiple Squatting apps and compose them into a single app.  For
+example, suppose you built a site and decided that you'd like to add a forum.
+You could take a hypothetical forum app written in Squatting and just mount
+it at an arbitrary path like /forum.
+
+=item B<Squatting Apps Are Embeddable>
+
+Already using another framework?  No problem.  You should be able to embed
+Squatting apps into apps written in anything from CGI on up to Catalyst.
+(The documentation for this will be written soon.)
 
 =item B<Minimal Policy>
 
-You may use any templating system you want, and you may use any ORM(*) you want.
-We only have a few rules on how the controller code and the view code should be
-organized, but beyond that, you are free.
+You may use any templating system you want, and you may use any ORM (B<***>) you
+want.  We only have a few rules on how the controller code and the view code
+should be organized, but beyond that, you are free.
 
 =back
 
-* Regarding ORMs, the nature of Continuity makes it somewhat DBI-unfriendly, so
-this may be a deal-breaker for many of you.  However, I look at this as an
-opportunity to try novel storage systems like CouchDB, instead.  With the high
-level of concurrency that Squatting can support (thanks to Continuity) we are
-probably better off this way.
+B<*> Depending on how you measure the code size, we could be as low as 4.8K.
+That's if I only count Squatting, Squatting::Controller, and Squatting::View.
+When I count every perl module in this distribution, we get up to 7.7K.  I
+only mention this, because Camping doesn't count everything in its 3K size.
+(Sadly, I am not a master of obfuscation.  4K seemed attainable, but now that
+they're down to 3K, I just don't know what to do.  ;-)
+
+B<**> RESTless controllers only work when you're using Continuity as your
+foundation.
+
+B<***> Regarding ORMs, the nature of Continuity (B<****>) makes it somewhat
+DBI-unfriendly, so this may be a deal-breaker for many of you.  However, I look
+at this as an opportunity to try novel storage systems like CouchDB, instead.
+With the high level of concurrency that Squatting can support (when using
+Continuity) we are probably better off this way.
+
+B<****> If you're not using Continuity, then really feel free to use any ORM.
+
 
 =head1 API
 
@@ -294,10 +344,21 @@ this is the method you should override in your subclass.
 
 This method takes no parameters and initializes some internal variables.
 
-=head3 App->go(%options)
+=head3 App->mount($AnotherApp, $prefix)
 
-This method calls init and then starts a Continuity-based web server.  The %options
-are passed straight through to Continuity.
+This method will mount another Squatting app at the specified prefix.
+
+  App->mount('My::Blog',   '/my/ridiculous/rantings');
+  App->mount('Forum',      '/forum');
+  App->mount('ChatterBox', '/chat');
+
+B<NOTE>:  You can only mount an app once.  Don't try to mount it again
+at some other prefix, because it won't work.
+
+=head3 App->relocate($prefix)
+
+This method will relocate a Squatting app to the specified prefix.  It's
+useful for embedding a Squatting app into app written using another framework.
 
 =head2 Use as a Helper for Controllers
 
@@ -308,13 +369,17 @@ are passed straight through to Continuity.
 
 This is a shortcut for:
 
-  Squatting::Controller->new(@_);
+  Squatting::Controller->new(
+    $name => \@urls, 
+    app   => $App, 
+    %methods
+  );
 
 =head3 R($name, @args, [ \%params ])
 
-R() is a URL generation function that takes a controller name and a list of arguments.
-You may also pass in a hashref representing CGI variables as the very last parameter
-to this function.
+R() is a URL generation function that takes a controller name and a list of
+arguments.  You may also pass in a hashref representing CGI variables as the
+very last parameter to this function.
 
 B<Example>:  Given the following controllers, R() would respond like this.
 
@@ -327,6 +392,9 @@ B<Example>:  Given the following controllers, R() would respond like this.
   R('Home', { foo => 1, bar => 2})      # "/?foo=1&bar=2"
   R('Profile', 'larry')                 # "/~larry"
   R('Profile', 'larry', 'json')         # "/~larry.json"
+                                                             
+As you can see, C<@args> represents the regexp captures, and C<\%params>
+represents the CGI query parameters.
 
 =head2 Use as a Helper for Views
 
@@ -337,15 +405,21 @@ B<Example>:  Given the following controllers, R() would respond like this.
 
 This is a shortcut for:
 
-  Squatting::View->new(@_);
+  Squatting::View->new($name, %methods);
 
 =head3 R($name, @args, [ \%params ])
 
 This is the same R() function that the controllers get access to.
+Please use it to generate URLs so that your apps may be composable
+and embeddable.
 
 =head1 SEE ALSO
 
-L<Squatting::Controller>, L<Squatting::View>, L<Squatting::Mapper>, L<Squatting::Q>
+L<Squatting::Controller>, L<Squatting::View>, L<Squatting::Mapper>,
+L<Squatting::On::Continuity>, L<Squatting::On::Catalyst>,
+L<Squatting::Cookbook>
+
+L<Class::C3::Componentised>
 
 =head2 Squatting Source Code
 
@@ -357,26 +431,26 @@ L<http://github.com/beppu/squatting/tree/master>
 
 =head2 Bavl Source Code
 
-We're going to throw Squatting into the metaphorical deep end by using it to
-implement the towr.of.bavl.org.  If you're looking for an example of how to use
-Squatting for an ambitious project, look at the Bavl code.
+We're going to throw Squatting (and Continuity) into the metaphorical deep end
+by using it to implement the towr.of.bavl.org.  It's a site that will help
+people learn foreign languages by letting you hear the phrases you're
+interested in learning as actually spoken by fluent speakers.  If you're
+looking for an example of how to use Squatting for an ambitious project, look
+at the Bavl code.
 
 L<http://github.com/beppu/bavl/tree/master>
 
 =head2 Continuity and Coro
 
-When you want to start dabbling with RESTless controllers, it would serve
-you well to understand how Continuity and Coro work.  I recommend reading the
-POD for the following Perl modules:
+When you want to start dabbling with RESTless controllers, it would serve you
+well to understand how Continuity, Coro and Event work.  To learn more, I
+recommend reading the POD for the following Perl modules:
 
 L<Continuity>,
 L<Coro>,
-L<Coro::Event>,
-L<Event>.
+L<AnyEvent>.
 
-Also, check out the Continuity web site.
-
-L<http://continuity.tlt42.org/>
+Combining coroutines with an event loop is a surprisingly powerful technique.
 
 =head2 Camping
 
@@ -402,9 +476,10 @@ the point of prototype-based OO.
 
 If you're going to add anything to JavaScript, make the prototype side of it
 stronger.  Look to languages like Io, and make it easier to clone objects and
-manipulate an object's prototype chain.  The beauty of prototypes is that this
-one concept can be used to unify objects, classes, and namespaces.  Look at Io
-if you don't believe me.
+manipulate an object's prototype chain.  The beauty of prototypes is that you
+can combine it with slot-based objects to unify the functionality of objects,
+classes, and namespaces into a surprisingly simple and coherent system.  Look
+at Io if you don't believe me.
 
 L<http://iolanguage.com/>
 

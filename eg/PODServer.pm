@@ -7,10 +7,14 @@ use File::Basename;
 use File::Find;
 use Config;
 
+# skip files we've already seen
+my %already_seen;
+
 # figure out where all(?) our pod is located
 # (loosely based on zsh's _perl_basepods and _perl_modules)
 our %perl_basepods = map {
   my ($file, $path, $suffix) = fileparse($_, ".pod");
+  $already_seen{$_} = 1;
   ($file => $_);
 } glob "$Config{installprivlib}/pod/*.pod";
 
@@ -24,6 +28,8 @@ sub scan {
       my $m = $File::Find::name;
       next if -d $m;
       next unless /\.(pm|pod)$/;
+      next if $already_seen{$m};
+      $already_seen{$m} = 1;
       $m =~ s/$inc//;
       $m =~ s/\.\w*$//;
       $m =~ s{^/}{};
@@ -35,6 +41,7 @@ sub scan {
   @perl_modules = sort keys %h;
 }
 scan;
+%already_seen = ();
 
 # *.pod takes precedence over *.pm
 sub pod_for {
@@ -64,7 +71,7 @@ our @C = (
   ),
 
   C(
-    Frames => [ '/frames' ],
+    Frames => [ '/@frames' ],
     get    => sub {
       my ($self) = @_;
       $self->v->{title} = 'POD Server';
@@ -76,7 +83,7 @@ our @C = (
   # and find the file that contains the POD for it.
   # Then it asks the view to turn the POD into HTML.
   C(
-    Pod => [ '/pod/(.*)' ],
+    Pod => [ '/(.*)' ],
     get => sub {
       my ($self, $module) = @_;
       my $v        = $self->v;
@@ -105,7 +112,7 @@ use Data::Dump 'pp';
 use HTML::AsSubs;
 use Pod::Simple;
 use Pod::Simple::HTML;
-$Pod::Simple::HTML::Perldoc_URL_Prefix = '/pod/';
+$Pod::Simple::HTML::Perldoc_URL_Prefix = '/';
 
 # the ~literal pseudo-element -- don't entity escape this content
 sub x {
@@ -164,6 +171,13 @@ our @V = (
         }
         pre {
           font-size: 9pt;
+          background: #000;
+          color: #ccd;
+        }
+        code {
+          font-size: 9pt;
+          font-weight: bold;
+          color: #fff;
         }
         a {
           color: #fc4;
@@ -186,14 +200,12 @@ our @V = (
           list-style: none;
         }
         div#pod {
-          width: 540px;
+          width: 580px;
           margin: 2em 4em 2em 4em;
         }
         div#pod pre {
           padding: 0.5em;
-          background: #000;
           border: 1px solid #444;
-          color: #ccd;
           -moz-border-radius-bottomleft: 7px;
           -moz-border-radius-bottomright: 7px;
           -moz-border-radius-topleft: 7px;
@@ -232,7 +244,7 @@ our @V = (
         head(
           title($v->{title})
         ),
-        frameset({ cols => '*,380' },
+        frameset({ cols => '*,340' },
           frame({ name => 'pod',  src => R('Pod', 'Squatting') }),
           frame({ name => 'list', src => R('Home', { base => 'pod' }) }),
         ),

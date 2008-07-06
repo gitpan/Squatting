@@ -7,26 +7,11 @@ no  warnings 'redefine';
 
 use CGI::Cookie;
 
-use Squatting ':controllers';
-
 our $AUTOLOAD;
 
 # constructor
 sub new {
   bless { name => $_[1], urls => $_[2], @_[3..$#_] } => $_[0];
-}
-
-# init w/ Continuity::Request
-sub init {
-  my ($self, $cr) = @_;
-  $self->cr       = $cr;
-  $self->env      = e($cr->http_request);
-  $self->cookies  = c($self->env->{HTTP_COOKIE});
-  $self->input    = i(join('&', grep { defined } ($self->env->{QUERY_STRING}, $cr->request->content)));
-  $self->headers  = { 'Content-Type' => 'text/html' };
-  $self->v        = {};
-  $self->status   = 200;
-  $self;
 }
 
 # (shallow) copy constructor
@@ -45,12 +30,14 @@ sub clone {
 # status  - outgoing HTTP Response status
 # headers - outgoing HTTP headers
 # view    - name of default view
-for my $m qw(name urls cr env input cookies state v status headers view) {
+# log     - logging object
+# app     - name of our app
+for my $m qw(name urls cr env input cookies state v status headers log view app) {
   *{$m} = sub : lvalue { $_[0]->{$m} }
 }
 
-# HTTP (get post)    ## TODO (put delete head options etc...) ##
-for my $m qw(get post) {
+# HTTP (get post)
+for my $m qw(get post put delete head options trace connect) {
   *{$m} = sub { $_[0]->{$m}->(@_) }
 }
 
@@ -59,11 +46,13 @@ sub render {
   my ($self, $template, $vn) = @_;
   my $view;
   $vn ||= $self->view;
+  my $app = $self->app;
   if (defined($vn)) {
     $view = ${$app."::Views::V"}{$vn}; #  hash
   } else {                             #    vs
     $view = ${$app."::Views::V"}[0];   # array -- Perl provides a lot of 'namespaces' so why not use them?
   }
+  $view->headers = $self->headers;
   $view->$template($self->v);
 }
 
@@ -72,43 +61,6 @@ sub redirect {
   my ($self, $l, $s) = @_;
   $self->headers->{Location} = $l || '/';
   $self->status = $s || 302;
-}
-
-# \%env = e($http_request)  # Get request headers from HTTP::Request.
-sub e {
-  my $r = shift;
-  my %env;
-  my $uri = $r->uri;
-  $env{QUERY_STRING}   = $uri->query || '';
-  $env{REQUEST_PATH}   = $uri->path;
-  $env{REQUEST_URI}    = $uri->path_query;
-  $env{REQUEST_METHOD} = $r->method;
-  $r->scan(sub{
-    my ($header, $value) = @_;
-    my $key = uc $header;
-    $key =~ s/-/_/g;
-    $key = "HTTP_$key";
-    $env{$key} = $value;
-  });
-  \%env;
-}
-
-# \%input = i($query_string)  # Extract CGI parameters from QUERY_STRING
-sub i {
-  my $q = CGI->new($_[0]);
-  my %i = $q->Vars;
-  +{ map {
-    if ($i{$_} =~ /\0/) {
-      $_ => [ split("\0", $i{$_}) ];
-    } else {
-      $_ => $i{$_};
-    }
-  } keys %i }
-}
-
-# \%cookies = c($cookie_header)  # Parse Cookie header(s).
-sub c {
-  +{ map { ref($_) ? $_->value : $_ } CGI::Cookie->parse($_[0]) };
 }
 
 # default 404 controller
@@ -178,11 +130,23 @@ Given a L<Continuity::Request> object, this method will initialize the controlle
 
 =head3 $c->get(@args)
 
-This method is called when GET requests to the controller are made.
-
 =head3 $c->post(@args)
 
-This method is called when POST requests to the controller are made.
+=head3 $c->put(@args)
+
+=head3 $c->delete(@args)
+
+=head3 $c->head(@args)
+
+=head3 $c->options(@args)
+
+=head3 $c->trace(@args)
+
+=head3 $c->connect(@args)
+
+These methods are called when their respective HTTP requests are sent to the
+controller.  @args is the list of regex captures from the URL pattern in
+$c->urls that matched $c->env->{REQUEST_PATH}.
 
 =head2 Attribute Accessors
 
@@ -237,11 +201,22 @@ See L<HTTP::Status> for more details.
 
 This returns a hashref representing the outgoing HTTP headers.
 
+=head3 $c->log
+
+This returns a logging object if one has been set up for your app.  If it
+exists, you should be able to call methods like C<debug()>, C<info()>,
+C<warn()>, C<error()>, and C<fatal()> against it, and the output of this would
+typically end up in an error log.
+
 =head3 $c->view
 
 This returns the name of the default view for the current request.  If
 it's undefined, the first view in @App::Views::V will be considered the
 default.
+
+=head3 $c->app
+
+This returns the name of the app that this controller belongs to.
 
 =head2 Output
 
@@ -259,8 +234,7 @@ second parameter.
 =head1 SEE ALSO
 
 L<Squatting>,
-L<Squatting::View>,
-L<Squatting::Q>
+L<Squatting::View>
 
 =cut
 

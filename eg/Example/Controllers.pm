@@ -2,7 +2,6 @@ package Example::Controllers;
 
 use strict;
 use warnings;
-use base 'Squatting::Q';
 
 use Squatting ':controllers';
 use Data::Dump qw(dump);
@@ -50,11 +49,12 @@ our @C = (
     # GET requests to the Count controller have the following properties:
     # - They are sent to a different session queue.
     # - The session queue is named "${session_id}.count".
-    # - The subroutine attribute Q(count) is what made that happen.
-    # - Squatting::Mapper is aware of Q-attributed subroutines.
-    # - It will run in its own coroutine separate from the RESTful controllers.
+    # - The queue => { get => 'count' } is what made this happen.
+    # - Squatting::Mapper treats controllers with a queue attribute specially.
+    # - It will run GET requests in their own coroutine separate from the 
+    #   RESTful controllers.
     # - This coroutine may handle many more HTTP requests.
-    get => sub : Q(count) {
+    get => sub {
       my ($self) = @_;
       my $cr     = $self->cr;
       my $i      = 1;
@@ -66,7 +66,8 @@ our @C = (
       }
     },
     post => sub {
-    }
+    },
+    queue => { get => 'count' }
   ),
 
   C(
@@ -91,8 +92,9 @@ our @C = (
       # The generic template, '_', is used 
       #   when no other template can be found.
     }
-  )
+  ),
 
 );
+
 
 1;
