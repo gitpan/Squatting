@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Squatting
-version:             0.40
+version:             0.41
 abstract:            A Camping-inspired Web Microframework for Perl
 license:             mit
 author:              

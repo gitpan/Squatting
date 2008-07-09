@@ -11,7 +11,7 @@ use URI::Escape;
 use Carp;
 use Data::Dump 'pp';
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 # TODO - Move $I and the code that uses it out to another (optional) module.
 our $I = 0;
@@ -137,7 +137,7 @@ sub init {
   @{$_[0]."::Views::V"};
 }
 
-# App->service($controller, @params)  # Override this method if you want to take actions before or after a request is handled.
+# App->service($controller, @params)  # Handle one RESTful HTTP request
 sub service {
   my ($app, $c, @params) = grep { defined } @_;
   my $method = lc $c->env->{REQUEST_METHOD};
@@ -257,8 +257,8 @@ squat on top of any Perl-based web framework (in theory).
 =item B<Concise API>
 
 _why did a really good job designing Camping's API so that you could get the
-MOST done with the LEAST amount of code possible.  I loved Camping's API so
-much that I ported it to Perl.
+B<MOST> done with the B<LEAST> amount of code possible.  I loved Camping's API
+so much that I ported it to Perl.
 
 =item B<Tiny Codebase>
 
@@ -415,11 +415,23 @@ and embeddable.
 
 =head1 SEE ALSO
 
+=over 4
+
+=item B<Other Squatting::* modules>:
+
 L<Squatting::Controller>, L<Squatting::View>, L<Squatting::Mapper>,
 L<Squatting::On::Continuity>, L<Squatting::On::Catalyst>,
 L<Squatting::Cookbook>
 
+=item B<Squatting's superclass>:
+
 L<Class::C3::Componentised>
+
+=item B<The first useful Squatting app released on CPAN>:
+
+L<Pod::Server>
+
+=back
 
 =head2 Squatting Source Code
 
