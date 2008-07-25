@@ -24,7 +24,7 @@ GetOptions(
   'config|c=s%',
   'show-config|s',
   'logo',
-  'h|help',
+  'help|h',
 );
 
 sub help {
@@ -84,6 +84,7 @@ if ($app) {
       exit 1;
     }
     $app->init;
+    # XXX - I have to think this over.
     sub Squatting::Controller::mock_init {
       my $self = shift;
       $self->{cr}          = {}; # TODO - provide a mock Continuity::Request
@@ -162,8 +163,8 @@ Port for web server (defaults to 4234)
 =item -c, --config ATTR=VALUE
 
 The standard way to configure a Squatting application is to manipulate its
-%App::CONFIG hash.  The --config option lets you set values in this
-hash, and you may use --config multiple times in a single command line.
+C<%CONFIG> hash.  The --config option lets you set values in this hash, and you
+may use --config multiple times in a single command line.
 
 B<Example>:
 

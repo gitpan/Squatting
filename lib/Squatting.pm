@@ -11,7 +11,7 @@ use URI::Escape;
 use Carp;
 use Data::Dump 'pp';
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 # TODO - Move $I and the code that uses it out to another (optional) module.
 our $I = 0;
@@ -38,13 +38,13 @@ sub import {
       my $c = ${$app."::Controllers::C"}{$controller};
       croak "$controller controller not found" unless $c;
       my $arity = @params;
-      my $pattern = first { my @m = /\(.*?\)/g; $arity == @m } @{$c->urls};
-      croak "couldn't find a matching URL pattern" unless $pattern;
-      while ($pattern =~ /\(.*?\)/) {
-        $pattern =~ s{\(.*?\)}{uri_escape(+shift(@params), "^A-Za-z0-9\-_.!~*’()/")}e;
+      my $path = first { my @m = /\(.*?\)/g; $arity == @m } @{$c->urls};
+      croak "couldn't find a matching URL path" unless $path;
+      while ($path =~ /\(.*?\)/) {
+        $path =~ s{\(.*?\)}{uri_escape(+shift(@params), "^A-Za-z0-9\-_.!~*’()/")}e;
       }
       if ($input) {
-        $pattern .= "?".  join('&' => 
+        $path .= "?".  join('&' => 
           map { 
             my $k = $_;
             ref($input->{$_}) eq 'ARRAY'
@@ -52,7 +52,7 @@ sub import {
               : "$_=".uri_escape($input->{$_})
           } keys %$input);
       }
-      $pattern;
+      $path;
     };
 
     # ($controller, \@regex_captures) = D($path)  # Return controller and captures for a path
@@ -92,7 +92,7 @@ sub import {
   $m->load_components(@c) if @c;
 }
 
-# Squatting plugins may be anywhere in Squatting::* but by convention
+# Squatting plugins may be anywhere in Squatting::*::* but by convention
 # (and for fun) you should use poetic diction in your package names.
 #
 # Squatting::On::Continuity
@@ -100,7 +100,7 @@ sub import {
 # Squatting::On::CGI
 # Squatting::On::Jifty 
 #
-# (all your framework are belong to us)
+# (ALL YOUR FRAMEWORK ARE BELONG TO US)
 #
 # Squatting::With::Impunity (What could we do w/ this name?)
 # Squatting::With::Log4Perl (which is how we could add logging support)
@@ -202,14 +202,15 @@ What a basic App looks like:
     package App::Controllers;
     use Squatting ':controllers';
 
-    # Setup a list of controller objects using the C() function.
+    # Setup a list of controller objects in @C using the C() function.
     our @C = (
       C(
         Home => [ '/' ],
         get  => sub {
           my ($self) = @_;
           my $v = $self->v;
-          $v->{title} = 'Hello, World!';
+          $v->{title}   = 'A Simple Squatting Application';
+          $v->{message} = 'Hello, World!';
           $self->render('home');
         },
         post => sub { }
@@ -222,17 +223,17 @@ What a basic App looks like:
     package App::Views;
     use Squatting ':views';
 
-    # Setup a list of view objects using the V() function.
+    # Setup a list of view objects in @V using the V() function.
     our @V = (
       V(
         'html',
         layout  => sub {
           my ($self, $v, $content) = @_;
-          "<html><body>$content</body></html>"
+          "<html><title>$v->{title}</title><body>$content</body></html>"
         },
         home    => sub {
           my ($self, $v) = @_;
-          "<h1>$v->{title}</h1>"
+          "<h1>$v->{message}</h1>"
         },
       ),
     );
@@ -280,7 +281,7 @@ COMET), so we try to make RESTless controllers easy to express as well. B<**>
 =item B<Views Are ...Different>
 
 The View API feels like Camping, but Squatting allows multiple views to coexist
-(somewhat like Catalyst (but not quite)).
+(kinda like Catalyst (but not quite)).
 
 =item B<Squatting Apps Are Composable>
 
@@ -308,7 +309,7 @@ That's if I only count Squatting, Squatting::Controller, and Squatting::View.
 When I count every perl module in this distribution, we get up to 7.7K.  I
 only mention this, because Camping doesn't count everything in its 3K size.
 (Sadly, I am not a master of obfuscation.  4K seemed attainable, but now that
-they're down to 3K, I just don't know what to do.  ;-)
+they're down to 3K, I don't know what to do.  ;-)
 
 B<**> RESTless controllers only work when you're using Continuity as your
 foundation.
@@ -328,6 +329,7 @@ B<****> If you're not using Continuity, then really feel free to use any ORM.
 
   package App;
   use base 'Squatting';
+  our %CONFIG = ();
   1;
 
 =head3 App->service($controller, @args)
@@ -357,13 +359,20 @@ at some other prefix, because it won't work.
 
 =head3 App->relocate($prefix)
 
-This method will relocate a Squatting app to the specified prefix.  It's
-useful for embedding a Squatting app into app written using another framework.
+This method will relocate a Squatting app to the specified prefix.  It's useful
+for embedding a Squatting app into apps written in other frameworks.
 
 =head2 Use as a Helper for Controllers
 
+In this package, you will define a list of L<Squatting::Controller> objects in C<@C>.
+
   package App::Controllers;
   use Squatting ':controllers';
+  our @C = (
+    C(...),
+    C(...),
+    C(...),
+  );
 
 =head3 C($name => \@urls, %methods)
 
@@ -398,8 +407,16 @@ represents the CGI query parameters.
 
 =head2 Use as a Helper for Views
 
-  package App::Controllers;
+In this package, you will define a list of L<Squatting::View> objects in C<@V>.
+
+  package App::Views;
   use Squatting ':views';
+  our @V = (
+    V(
+      'html',
+      home => sub { "<h1>Home</h1>" },
+    ),
+  );
 
 =head3 V($name, %methods)
 
@@ -499,6 +516,8 @@ L<http://iolanguage.com/>
 
 John BEPPU E<lt>beppu@cpan.orgE<gt>
 
+Scott WALTERS (aka scrottie) gets credit for the name of this module.
+
 =head1 COPYRIGHT
 
 Copyright (c) 2008 John BEPPU E<lt>beppu@cpan.orgE<gt>.
@@ -530,11 +549,11 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 # Local Variables: ***
 # mode: cperl ***
-# indent-tabs-mode: f ***
+# indent-tabs-mode: nil ***
 # cperl-close-paren-offset: -2 ***
 # cperl-continued-statement-offset: 2 ***
 # cperl-indent-level: 2 ***
 # cperl-indent-parens-as-block: t ***
-# cperl-tab-always-indent: f ***
+# cperl-tab-always-indent: nil ***
 # End: ***
 # vim:tabstop=8 softtabstop=2 shiftwidth=2 shiftround expandtab
