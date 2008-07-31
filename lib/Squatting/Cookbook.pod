@@ -14,10 +14,11 @@ this API is, and I hope they'll see just how far a little bit of code can go.
 
 =head2 Anatomy of a Squatting Application
 
-=head3 Pick a Name for Your App
+=head3 Subclass Squatting
 
   package App;
   use base 'Squatting';
+  our %CONFIG = ();
 
 =head3 Make a Package for Your Controllers
 
@@ -87,17 +88,12 @@ If your app is called C<App>, then:
 =head4 Anatomy of a View
 
 
-=head2 Special Powers of Continuity
-
 
 =head1 PROGRAMMING TECHNIQUES
 
 =head2 COMET
 
 =head3 Event Architecture
-
-The L<Continuity> backend is the only one that will currently allow you to use
-COMET-based techniques.
 
 =head3 RESTless Controllers
 
@@ -120,11 +116,15 @@ stick around, so that's what we'll use to implement persistent sessions.
     if (defined $sid) {
       $c->state = $state{$sid} ||= {};
     } 
-    $app->SUPER::service($c, @args);
+    $app->next::method($c, @args);
   }
 
 Here, we override service() in the main module of our app so that $c->state will
 provide a hashref whose values will persist between requests.
+
+Note that instead of writing C<$app-E<gt>SUPER::service>, we have to write
+C<$app-E<gt>next::method>, because Squatting is a sublcass of
+L<Class::C3::Componentised>.
 
 
 =head3 Without Continuity

@@ -37,7 +37,7 @@ for my $m qw(name urls cr env input cookies state v status headers log view app)
 }
 
 # HTTP methods
-for my $m qw(get post put delete head options trace connect) {
+for my $m qw(get post head put delete options trace connect) {
   *{$m} = sub { $_[0]->{$m}->(@_) }
 }
 
@@ -68,7 +68,8 @@ my $not_found = sub { $_[0]->status = 404; $_[0]->env->{REQUEST_PATH}." not foun
 our $r404 = Squatting::Controller->new(
   R404 => [],
   get  => $not_found,
-  post => $not_found
+  post => $not_found,
+  app  => 'Squatting'
 );
 
 1;
