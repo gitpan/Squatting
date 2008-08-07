@@ -10,7 +10,7 @@ use List::Util qw(first);
 use URI::Escape;
 use Carp;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 require Squatting::Controller;
 require Squatting::View;
@@ -278,7 +278,7 @@ it at an arbitrary path like /forum.
 
 Already using another framework?  No problem.  You should be able to embed
 Squatting apps into apps written in anything from CGI on up to Catalyst.
-(The documentation for this will be written soon.)
+B<Squatting is compatible with EVERYONE.>
 
 =item B<Minimal Policy>
 
@@ -421,7 +421,7 @@ and embeddable.
 =item B<Other Squatting::* modules>:
 
 L<Squatting::Controller>, L<Squatting::View>, L<Squatting::Mapper>,
-L<Squatting::On::Continuity>, L<Squatting::On::Catalyst>,
+L<Squatting::On::Continuity>, L<Squatting::On::Catalyst>, L<Squatting::On::CGI>
 L<Squatting::With::AccessTrace>,
 L<Squatting::Cookbook>
 
@@ -446,8 +446,8 @@ L<http://github.com/beppu/squatting/tree/master>
 =head2 Bavl Source Code
 
 We're going to throw Squatting (and Continuity) into the metaphorical deep end
-by using it to implement the towr.of.bavl.org.  It's a site that will help
-people learn foreign languages by letting you hear the phrases you're
+by using it to implement the L<http://towr.of.bavl.org/>.  It's a site that
+will help people learn foreign languages by letting you hear the phrases you're
 interested in learning as actually spoken by fluent speakers.  If you're
 looking for an example of how to use Squatting for an ambitious project, look
 at the Bavl code.
