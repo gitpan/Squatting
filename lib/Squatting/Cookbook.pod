@@ -108,6 +108,7 @@ RESTful and stateless by default, so you can't count on the lexical scope of a
 controller to stick around between requests.  Luckily, package variables *will*
 stick around, so that's what we'll use to implement persistent sessions.
 
+  package App;
   our %state;
   sub service {
     my ($app, $c, @args) = @_;
@@ -127,31 +128,259 @@ C<$app-E<gt>next::method>, because Squatting is a sublcass of
 L<Class::C3::Componentised>.
 
 
-=head3 Without Continuity
+=head3 When Squatting::On::Catalyst
 
-The challenge is to find a way to assign unique session ids to each visitor, and
-use that session id as a key into a persistent store.
+When squatting on top of Catalyst, the Catalyst session becomes
+C<$self-E<gt>state> in Squatting.  The session storage code in Catalyst is very
+mature, so it is highly recommended that all the session setup be done on the
+Catalyst side.
+
+
+=head3 Sessions From Scratch
+
+The challenge is to find a way to assign unique session ids to each visitor and
+use that session id as a key into a persistent store.  TMTOWTDI
 
 
 =head2 How to Use Various Templating Systems With Squatting
 
 =head3 HTML::AsSubs
 
+I like L<HTML::AsSubs> for the following reasons:
+
+=over 4
+
+=item * It works as advertised.
+
+=item * The implementation is really small.
+
+=item * It seems to be widely deployed (even though no one uses it).
+
+=item * And generating HTML with code eliminates the need to install templates.
+
+=back
+
+The documentation is up-front about some of the module's shortcomings which I
+appreciate.  However, the docs go a bit too far and recommend that this module
+not even be used!  It says that there are "cleaner" alternatives, but when I
+looked at them, I came straight back to HTML::AsSubs.
+
+I think the module works just fine, and I'd like to show you how I use it.
+
+=head4 Addressing HTML::AsSubs Shortcomings (Alleged and Otherwise)
+
+=over 4
+
+=item The exported link() function overrides the builtin link() function. 
+
+Noted.  You shouldn't be calling the builtin C<link()> in view code anyway, so
+it's not a big deal.
+
+=item The exported tr() function must be called using &tr(...) syntax.
+
+This is because it clashes with the builtin tr/../../ operator.
+I can live with this.
+
+=item Problem: exports so damned much.  (from the code comments)
+
+The funny thing is, it's actually not exporting enough.  It's missing a sub for
+the C<span> tag.  (Did that tag even exist in 1994 when this module was
+written?)  Luckily, this is easy to fix.
+
+  sub span { HTML::AsSubs::_elem('span', @_) }
+
+If there are any other missing tags, you know what to do.
+
+=back
+
+There's one more pseudo-tag that I like to add for practical reasons.
+
+  sub x { map { HTML::Element->new('~literal', text => $_) } @_ }
+
+Normally, HTML::AsSubs will entity escape all the text that you give it.
+However, there are many times when you legitimately don't want text to be
+entity escaped, so that's what C<x()> is for.
+
+=head4 An Example View That Uses HTML::AsSubs
+
+  package App::Views;
+  use strict;
+  use warnings;
+  use Squatting ':views';
+  use HTML::AsSubs;
+
+  sub span { HTML::AsSubs::_elem('span', @_) }
+  sub x    { map { HTML::Element->new('~literal', text => $_) } @_ }
+
+  our @V = (
+    V(
+      'html',
+      layout => sub {
+        my ($self, $v, $content) = @_;
+        html(
+          head(
+            title( $v->{title} ),
+            style(x( $self->_css )),
+          ),
+          body(
+            x( $content )
+          )
+        )->as_HTML;
+      },
+      _css => sub {qq|
+        body {
+          background : #000;
+          color      : #f5deb3;
+        }
+      |},
+      home => sub {
+        my ($self, $v) = @_;
+        h1( $v->{message} )->as_HTML;
+      },
+    ),
+  );
+  1;
+
+Again, the nicest part about generating HTML from code is that you don't have
+to worry about installing template files.  The templates are in memory as perl
+expressions.  When building web apps that are designed to be embedded, this is
+a really nice feature to have as it makes deployment that much easier.
+
+If HTML::AsSubs is a bit too low tech for you, there are more modern
+expressions of the code-to-html idea on CPAN.  For example, L<Template::Declare>
+looks like it may be worth looking into.  I'm happy with HTML::AsSubs, though.
+
+
 =head3 Tenjin
 
-=head3 Template::Toolkit
+Tenjin is the fastest templating system that no one outside of Japan seems to
+know about.  It's really unfortunate that this module isn't on CPAN, but
+hopefully this will be rectified in the near future.  Until then, you can
+download it from L<http://kuwata-lab.com/>.
+
+=head4 An Example View That Uses Tenjin
+
+First, make sure your template_path is configurable for deployment purposes.
+
+  package App;
+  our %CONFIG = (
+    template_path => './www'
+  );
+
+And here is the actual view:
+
+  package App::Views;
+  use strict;
+  use warnings;
+  no  warnings 'once';
+  use Squatting ':views';
+  use Tenjin;
+
+  # make functions defined in this package available to templates
+  use base 'Tenjin::Context';
+  eval $Tenjin::Context::defun;
+  $Tenjin::CONTEXT_CLASS = 'App::Views';
+
+  our @V = (
+    V(
+      'html',
+      tenjin => Tenjin::Engine->new({ 
+        path => [ $App::CONFIG{template_path} ], postfix => '.html' 
+      }),
+      layout => sub {
+        my ($self, $v, $content) = @_;
+        my $tenjin = $self->{tenjin};
+        $v->{content} = $content;
+        $tenjin->render(":layout", $v);
+      },
+      _ => sub {
+        my ($self, $v) = @_;
+        my $tenjin = $self->{tenjin};
+        $v->{self} = $self;
+        $tenjin->render(":$self->{template}", $v);
+      }
+    ),
+  );
+  1;
+
+That's all there is too it.  Views for other file-based templating systems will
+follow a similar pattern where the special C<_> template is used to map method
+names to filenames.
+
+=head3 Template Toolkit
+
+TODO
 
 =head3 HTML::Mason
 
+TODO
+
 =head3 HTML::Template
+
+TODO
 
 
 =head2 How to Internationalize and Localize Squatting Apps
 
+=head3 Using Subdomains For Maximum Flexibility
+
+I'm a fan of the way Wikipedia uses subdomains in its localization strategy.
+
+=head3 Locale::Maketext
+
 
 =head2 How to be an OpenID Consumer
 
+TODO - go into much more detail and clean up the code.
 
+helper function for making a Net::OpenID::Consumer object
+
+  sub csr {
+    my ($self) = @_;
+    return Net::OpenID::Consumer->new(
+      ua    => LWPx::ParanoidAgent->new,
+      cache => Cache::File->new(cache_root => '/tmp/openid-consumer-cache'),
+      args  => $self->input,
+      consumer_secret => '...',
+      required_root   => 'http://work:4234/'
+    );
+  }
+
+Login controller; form is provided somewhere else; POST is the entry point; 
+GET is where the sequence finishes.
+
+  C(
+    Login => [ '/login' ],
+    get => sub {
+      my ($self) = @_;
+      my $csr = csr($self);
+      $self->headers->{'Content-Type'} = 'text/plain';
+      if (my $setup_url = $csr->user_setup_url) {
+        # redirect/link/popup user to $setup_url
+        $self->redirect($setup_url);
+        return;
+      } elsif ($csr->user_cancel) {
+        # restore web app state to prior to check_url
+        return "user_cancel";
+      } elsif (my $vident = $csr->verified_identity) {
+         my $verified_url = $vident->url;
+         return "verified_url $verified_url !";
+      } else {
+         return "Error validating identity: " . $csr->err;
+      }
+    },
+    post => sub {
+      my ($self) = @_;
+      my $input = $self->input;
+      my $csr = csr($self);
+      my $claimed_identity = $csr->claimed_identity($input->{openid});
+      my $check_url = $claimed_identity->check_url(
+        return_to  => "http://work:4234/login",
+        trust_root => "http://work:4234/",
+      );
+      $self->redirect($check_url);
+    },
+  ),
 
 =head2 How to be an OpenID Provider
 
@@ -159,8 +388,15 @@ use that session id as a key into a persistent store.
 
 =head2 How to Compose Multiple Squatting Apps Into One App
 
-  App->mount('AnotherApp', '/prefix');
+After you C<init> the app, you can start mounting other apps.
 
+  App->mount('OtherApp0' => '/prefix0');
+  App->mount('OtherApp1' => '/prefix1');
+  App->mount('OtherApp2' => '/prefix2');
+
+If you need to C<relocate>, do that after you finish mounting.  The order is
+always C<init>, C<mount>, and C<relocate>.  Also, remember that an app can only
+be mounted once, and C<relocate> should only be called once.
 
 =head2 How to Embed a Squatting App Into Other Frameworks
 
@@ -214,8 +450,8 @@ TODO:  Implement a dhandler that embeds a Squatting app
 
 =head3 CGI
 
-To run a Squatting app in a CGI environment, a script like this has
-to be written.
+To run a Squatting app in a CGI environment, a script like the following has to
+be written.
 
   use App 'On::CGI';
   my $q = CGI->new;
@@ -226,8 +462,27 @@ to be written.
 The key to doing this right is to C<relocate> the app correctly.
 The path that you relocate to should be the same as the C<REQUEST_PATH>
 for the script.  For example, if the URL you use to get to the script
-is http://localhost/cgi-bin/app.cgi , then you should relocate to
+is F<http://localhost/cgi-bin/app.cgi>, then you should relocate to
 F</cgi-bin/app.cgi>.
+
+
+=head2 How to Replace a Squatting App's Layout
+
+Now that you've embedded or composed some Squatting apps together, the
+next thing you'll want to do is make the whole system of sites look
+consistent.  To do this, you'll usually get the App's first view object
+and replace its layout method with your own.
+
+  my $view = $App::Views::V[0];
+  $view->{layout} = sub {
+    my ($self, $v, $content) = @_;
+    # 
+    # make the layout look however you want
+    # using any templating system you want
+    # ( or none at all )
+    # and return a string
+    #
+  };
 
 =head1 DEPLOYMENT TECHNIQUES
 
@@ -257,6 +512,7 @@ you've suddenly got a lot of traffic to your site, this section is for you.
 
 TODO
 
+=for later
 L<http://onsmalltalk.com/programming/smalltalk/seaside/scaling-seaside-more-advanced-load-balancing-and-publishing/>
 
 =head2 Linux and OpenSSI
