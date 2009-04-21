@@ -7,87 +7,171 @@ Squatting::Cookbook - Web Development Techniques for Squatting
 Squatting exists because I fell in love with Camping's API, and I couldn't bear
 the thought of building another site using some other API.  When I decided that
 the next site I wanted to build would be implemented in Perl, I had no choice
-but to port Camping to Perl, and that's how Squatting was born.
+but to port Camping from Ruby to Perl, and that's how Squatting was born.
 
 My hope is that other Perl programmers will be able to appreciate how concise
 this API is, and I hope they'll see just how far a little bit of code can go.
 
-=head2 Anatomy of a Squatting Application
 
-=head3 Make a Subclass of Squatting
+=head2 The Anatomy of a Squatting Application
+
+
+
+=head3 The Main Module should be a subclass of Squatting
 
   package App;
+  use strict;
+  use warnings;
   use base 'Squatting';
-  our %CONFIG = ();
 
-=head3 Make a Package for Your Controllers
+  # Be sure to pull in the other modules of your app.
+  use App::Controllers;
+  use App::Views;
 
-If your app is called C<App>, then:
+  # OPTIONAL: App configuration
+  our %CONFIG = (
+    root => 'www'
+  );
 
-=over 4
+  # OPTIONAL: App initialization
+  sub init {
+    my ($class) = @_;
 
-=item Your controllers must be defined in a package called C<App::Controllers>.
+    # If there is any initialization that you want to do
+    # when the app starts up, the init method is a good
+    # place to do it.
 
-=item You must say C<use Squatting ':controllers'>.
+    $class->next::method;
+  }
 
-=item You must put your controllers in a package variable named C<@C>.
+  # OPTIONAL: Response wrapper
+  sub service {
+    my ($class, $c, @args) = @_;
 
-=back
+    # Like Camping, the service method can be overridden
+    # to let your code do things before and after a request.
+    # The parameters to this method are:
+    #
+    # $c    - the Squatting::Controller object
+    # @args - regex captures created by matching $c->urls
+    #           against the request path
+
+    # - before a request
+
+    my $body = $class->next::method(@args);
+
+    # - after a request
+
+    # and be sure to return the response body (if any)
+    $body;
+  }
+
+  1;
+
+=head3 The Controllers Module Should Contain a List of Controller Objects
 
   package App::Controllers;
+  use strict;
+  use warnings;
   use Squatting ':controllers';
+
+  # - @C contains Squatting::Controller objects
   our @C = (
+
+    # Typically, you'll start with a controller for the app's home page.
     C(
-      Home => [ '/' ],
-      get  => sub {
+      # Name => [ @list_of_url_patterns ]
+      Home   => [ '/' ],
+
+      # method => handler
+      get      => sub {
         my ($self) = @_;
+        $self->v->{message} = 'Hello, world.';
         $self->render('home');
       }
     ),
+
+    # Here's an example of a controller that handles both
+    # GET and POST requests.
     C(
-      Profile => [ '/~(\w+)' ],
-      get => sub {
-        my ($self, $name) = @_;
-        my $v = $self->v;
-        $v->{name} = $name;
-        $self->render('profile');
+      # Name  => [ @list_of_url_patterns ]
+      Contact => [ '/contact' ],
+
+      # method => handler
+      get      => sub {
+        my ($self) = @_;
+        $self->render('contact');
+      },
+
+      # method => handler
+      post     => sub {
+        my ($self) = @_;
+        $self->redirect(R('Contact'));
+      },
+    ),
+
+    # Here's an example of a controller for handling static requests.
+    C(
+      # Name => [ @list_of_url_patterns ]
+      Static => [ '/(css|js|images/.*)' ],
+
+      # It's OK to put extra data in the controller.
+      mime => {
+        css => 'text/css',
+        js  => 'text/javascript',
+        jpg => 'image/jpeg',
+        gif => 'image/gif',
+        png => 'image/png',
+      },
+
+      # method => handler
+      get      => sub {
+        my ($self, $path) = @_;
+        if ($path =~ qr{\.\.}) {
+          $self->status = 403;
+          return;
+        }
+        my ($type) = ($path =~ /\.(\w+)$/);
+        $self->headers->{'Content-Type'} =
+          $self->{mime}->{$type} || 'text/plain';
+        my $file = "$App::CONFIG{root}/$path";
+        if (-e $file) {
+          return scalar read_file($file);
+        } else {
+          $self->status = 404;
+          return;
+        }
       }
-    )
+    ),
+
   );
 
-=head4 Anatomy of a Controller
+  1;
 
-=head3 Make a Package for Your Views
-
-If your app is called C<App>, then:
-
-=over 4
-
-=item Your views must be defined in a package called C<App::Views>.
-
-=item You must say C<use Squatting ':views'>.
-
-=item You must put your views in a package variable named C<@V>.
-
-=back
+=head3 The Views Module Should Contain a List of View Objects
 
   package App::Views;
+  use strict;
+  use warnings;
   use Squatting ':views';
+
+  # - @V contains Squatting::View objects
   our @V = (
     V(
-      'html',
+      'default',
       layout => sub {
+        my ($self, $v, $content) = @_;
       },
       home => sub {
+        my ($self, $v) = @_;
       },
-      profile => sub {
+      contact => sub {
+        my ($self, $v) = @_;
       },
     )
   );
 
-=head4 Anatomy of a View
-
-
+  1;
 
 =head1 PROGRAMMING TECHNIQUES
 
@@ -95,8 +179,100 @@ If your app is called C<App>, then:
 
 =head3 Event Architecture
 
+TODO - explain, possibly using IRC as a metaphor
+
+Events (and my current preference for ambient event generation)
+
+Channels
+
+Publishers
+
+Subscribers
+
+
 =head3 RESTless Controllers
 
+The following is the C<Event> controller from the Bavl project.  It is included
+here to give you something to ponder while I think about how to explain this
+better.  (I'm figuring this out as I go along.)
+
+  C(
+    Event => [ '/@event' ],
+    get => sub {
+      warn "coro [$Coro::current]";
+      my ($self) = shift;
+      my $input  = $self->input;
+      my $cr     = $self->cr;
+      my @ch     = channels($input->{channels});
+      my $last   = time;
+      while (1) {
+        # Output
+        warn "top of loop";
+        my @events =
+          grep { defined }
+          map  { my $ch = $bavl->channels->{$_}; $ch->read } @ch;
+        my $x = async {
+          warn "printing...";
+          $cr->print(encode_json(\@events));
+        };
+        $x->join;
+
+        # Hold for a brief moment until the next long poll request comes in.
+        warn "waiting for next request";
+        $cr->next;
+        $last = time;
+        my $channels = [ $cr->param('channels') ];
+        @ch = channels($channels);
+
+        # Try starting up 1 coroutine per channel.
+        # Each coroutine will have the same Coro::Signal object => $activity.
+        my $activity = Coro::Signal->new;
+        my @coros = map {
+          my $ch = $bavl->channels->{$_};
+          async { $ch->signal->wait; $activity->broadcast };
+        } @ch;
+
+        # The first one who sends a signal to $activity wins.
+        warn "waiting for activity on any of (@ch)";
+        $activity->timed_wait(20);
+
+        # Cancel the remaining coros.
+        for (@coros) { $_->cancel }
+      }
+    },
+
+    # The current POST action exists for debugging purposes, only.
+    # In practice, channel updates will happen ambiently
+    # when model data changes.
+    # Hooks will be put into place to facilitate this.
+    #
+    # In the future, the POST action may be used as a notification
+    # to the server side that $.ev.stop() happened
+    # on the client side.
+    post => sub {
+      my ($self) = shift;
+      my $input  = $self->input;
+      my $ch = $bavl->channels->{ $input->{channels} };
+      if ($ch) {
+        $ch->write({ type => 'time', value => scalar(localtime) });
+      }
+      1;
+    },
+    queue => { get => 'event' },
+  ),
+
+This might look scary, but if we're lucky, we'll be able to turn this into
+a reusable component.
+
+
+=head3 Long Polling with jQuery on the Client Side
+
+TODO
+
+jquery.ev.js
+
+  $.ev.loop('/@event')
+  $.ev.stop();
 
 =head2 How to Set Up Sessions
 
@@ -116,7 +292,7 @@ stick around, so that's what we'll use to implement persistent sessions.
     my $sid = $cr->{session_id};
     if (defined $sid) {
       $c->state = $state{$sid} ||= {};
-    } 
+    }
     $app->next::method($c, @args);
   }
 
@@ -156,7 +332,7 @@ I like L<HTML::AsSubs> for the following reasons:
 
 =item * It seems to be widely deployed (even though no one uses it).
 
-=item * And generating HTML with code eliminates the need to install templates.
+=item * And generating HTML with code eliminates the need to install template files.
 
 =back
 
@@ -171,7 +347,7 @@ I think the module works just fine, and I'd like to show you how I use it.
 
 =over 4
 
-=item The exported link() function overrides the builtin link() function. 
+=item The exported link() function overrides the builtin link() function.
 
 Noted.  You shouldn't be calling the builtin C<link()> in view code anyway, so
 it's not a big deal.
@@ -183,11 +359,12 @@ I can live with this.
 
 =item Problem: exports so damned much.  (from the code comments)
 
-The funny thing is, it's actually not exporting enough.  It's missing a sub for
-the C<span> tag.  (Did that tag even exist in 1994 when this module was
-written?)  Luckily, this is easy to fix.
+The funny thing is, it's actually not exporting enough.  It's missing subs for
+the C<span>, C<thead>, and C<tbody> tags.
 
-  sub span { HTML::AsSubs::_elem('span', @_) }
+  sub span  { HTML::AsSubs::_elem('span',  @_) }
+  sub thead { HTML::AsSubs::_elem('thead', @_) }
+  sub tbody { HTML::AsSubs::_elem('tbody', @_) }
 
 If there are any other missing tags, you know what to do.
 
@@ -209,8 +386,10 @@ entity escaped, so that's what C<x()> is for.
   use Squatting ':views';
   use HTML::AsSubs;
 
-  sub span { HTML::AsSubs::_elem('span', @_) }
-  sub x    { map { HTML::Element->new('~literal', text => $_) } @_ }
+  sub span  { HTML::AsSubs::_elem('span', @_) }
+  sub thead { HTML::AsSubs::_elem('thead', @_) }
+  sub tbody { HTML::AsSubs::_elem('tbody', @_) }
+  sub x     { map { HTML::Element->new('~literal', text => $_) } @_ }
 
   our @V = (
     V(
@@ -247,8 +426,9 @@ expressions.  When building web apps that are designed to be embedded, this is
 a really nice feature to have as it makes deployment that much easier.
 
 If HTML::AsSubs is a bit too low tech for you, there are more modern
-expressions of the code-to-html idea on CPAN.  For example, L<Template::Declare>
-looks like it may be worth looking into.  I'm happy with HTML::AsSubs, though.
+expressions of the code-to-html idea on CPAN.  For example,
+L<Template::Declare> and L<HTML::Tiny> may be worth looking into.  I'm happy
+with L<HTML::AsSubs>, though.
 
 
 =head3 Tenjin
@@ -256,7 +436,7 @@ looks like it may be worth looking into.  I'm happy with HTML::AsSubs, though.
 Tenjin is the fastest templating system that no one outside of Japan seems to
 know about.  It's really unfortunate that this module isn't on CPAN, but
 hopefully this will be rectified in the near future.  Until then, you can
-download it from L<http://kuwata-lab.com/>.
+download it from L<http://www.kuwata-lab.com/tenjin/>.
 
 =head4 An Example View That Uses Tenjin
 
@@ -283,9 +463,9 @@ And here is the actual view:
 
   our @V = (
     V(
-      'html',
-      tenjin => Tenjin::Engine->new({ 
-        path => [ $App::CONFIG{template_path} ], postfix => '.html' 
+      'tenjin',
+      tenjin => Tenjin::Engine->new({
+        path => [ $App::CONFIG{template_path} ], postfix => '.html'
       }),
       layout => sub {
         my ($self, $v, $content) = @_;
@@ -309,7 +489,44 @@ names to filenames.
 
 =head3 Template Toolkit
 
-TODO
+L<Template Toolkit|Template> is probably the most popular templating system in
+use by the Perl community as of this writing.  This is one way you could implement
+a view for it:
+
+  package App::Views;
+  use strict;
+  use warnings;
+  use Squatting ':views';
+  use Template;
+
+  our @V = (
+    V(
+      'html',
+      tt => Template->new($App::CONFIG{tt_config}),
+
+      layout => sub {
+        my ($self, $v, $body) = @_;
+        my $tt = $self->{tt};
+        $v->{body} = $body;
+        my $output;
+        $tt->process('layout' . $App::CONFIG{tt_postfix}, $v, \$output);
+        return $output;
+      },
+
+      _ => sub {
+        my ($self, $v) = @_;
+        my $tt = $self->{tt};
+        $v->{R} = \&R;
+        my $output;
+        $tt->process($self->{template} . $App::CONFIG{tt_postfix}, $v, \$output);
+        return $output;
+      },
+    ),
+  );
+  1;
+
+Credit for this example goes to draegtun.
+L<http://draegtun.wordpress.com/2008/10/21/using-template-toolkit-with-squatting/>
 
 =head3 HTML::Mason
 
@@ -317,16 +534,123 @@ TODO
 
 =head3 HTML::Template
 
-TODO
+L<HTML::Template> is one of the strictest templating systems around.  There is
+very little processing you can do from within the templates, so you're really
+forced to do all your data manipulation B<BEFORE> the templating system sees
+it.  Some people like this hard separation, and if you're one of them, here is
+how you'd make use of HTML::Template from within Squatting.
+
+  package App::Views;
+  use strict;
+  use warnings;
+  use Squatting ':views';
+  use HTML::Template::Pro;
+
+  our @V = (
+    V(
+      'html',
+      layout => sub {
+        my ($self, $v, $content) = @_;
+        my $root = $App::CONFIG{root};
+        my $t = HTML::Template::Pro->new(filename => "$root/layout.html");
+        $v->{content} = $content;
+        $t->param(%$v);
+        $t->output;
+      },
+      _ => sub {
+        my ($self, $v) = @_;
+        my $root = $App::CONFIG{root};
+        my $template = $self->{template};
+        my $t = HTML::Template::Pro->new(filename => "$root/$template.html");
+        $t->param(%$v);
+        $t->output;
+      },
+    )
+  );
+  1;
+
+=head3 XML::Atom
+
+TODO - This is not a templating system, but it's useful to know how to generate
+well-formed Atom feeds, so I'm going to include it in this section as well.
+
+Views are not just for HTML....
+
+
+=head2 How to Take Advantage of Having Multiple Views
+
+In the documentation for the L<Squatting> module, it said that multiple views
+per app were supported, and that it was "kinda like Catalyst (but not quite)".
+L<Catalyst> also supports multiple views per app, so there are certain techniques
+that both frameworks can implement.
+
+=head3 Kinda Like Catalyst -- Views as Data Formats
+
+
+=head3 But Not Quite -- Multiple Views of the Same Format == Themes
 
 
 =head2 How to Internationalize and Localize Squatting Apps
 
-=head3 Using Subdomains For Maximum Flexibility
+The longer you wait to internationalize a web application, the harder the task
+becomes due to the ever increasing number of strings being used.  Thus, if you
+have any ambition of catering to an international audience, it would be wise to
+internationalize your application right from the beginning when the task is at
+its easiest.
 
-I'm a fan of the way Wikipedia uses subdomains in its localization strategy.
+=head3 Using Subdomains to Determine Language Preference
 
-=head3 Locale::Maketext
+First, we need a high-level strategy for determining what language to present
+to the user.  Wikipedia's approach of using 2-letter language codes in their
+subdomains is my favorite way of doing this.  (For example, the English version
+of Wikipedia is at L<http://en.wikipedia.org/> and the Korean version of
+Wikipedia is at L<http://ko.wikipedia.org/>.)
+
+I like this approach for a number of reasons.
+
+=over 4
+
+=item Visitors have control over what language to use.
+
+=item The URLs look nice while remaining easy to manage.
+
+=item It's search engine friendly.
+
+=back
+
+To make our Squatting apps aware of what subdomain was requested, the
+C<service()> method can be overridden as follows:
+
+  package App;
+  use strict;
+  use warnings;
+  use base 'Squatting';
+
+  use App::L10N;
+  use I18N::LangTags::List;
+
+  sub translation_function {
+    my ($c) = @_;
+    my @h   = split(/\./ => $c->env->{HTTP_HOST});
+    my $lang_tag = I18N::LangTags::List::name($h[0]) || 'en';
+    my $l10n     = App::L10N->get_handle($lang_tag);
+    sub { $l10n->maketext(@_) if @_ };
+  }
+
+  sub service {
+    my ($app, $c, @args) = @_;
+    $c->v->{tr} = translation_function($c);
+    $app->next::method($c, @args);
+  }
+
+The important code is in C<translation_function($c)>.
+
+=head3 Creating Localization Classes with Locale::Maketext
+
+
+=head3 Handling UTF-8 Input Correctly
+
+
 
 
 =head2 How to be an OpenID Consumer
@@ -346,7 +670,7 @@ helper function for making a Net::OpenID::Consumer object
     );
   }
 
-Login controller; form is provided somewhere else; POST is the entry point; 
+Login controller; form is provided somewhere else; POST is the entry point;
 GET is where the sequence finishes.
 
   C(
@@ -388,15 +712,20 @@ GET is where the sequence finishes.
 
 =head2 How to Compose Multiple Squatting Apps Into One App
 
-After you C<init> the app, you can start mounting other apps.
+B<*BEFORE*> you C<init> the app, you can mount other apps like this:
 
   App->mount('OtherApp0' => '/prefix0');
   App->mount('OtherApp1' => '/prefix1');
   App->mount('OtherApp2' => '/prefix2');
 
-If you need to C<relocate>, do that after you finish mounting.  The order is
-always C<init>, C<mount>, and C<relocate>.  Also, remember that an app can only
-be mounted once, and C<relocate> should only be called once.
+Once you're done mounting, run init:
+
+  App->init();
+
+Finally, if you need to C<relocate>, do that after you finish mounting.
+Remember:  the order is always C<mount>, C<init>, and C<relocate>.  Also,
+remember that an app can only be mounted once, and C<relocate> should only be
+called once.
 
 =head2 How to Embed a Squatting App Into Other Frameworks
 
@@ -440,9 +769,40 @@ this:
   App->init;
   sub default : Private { App->catalyze($_[1]) }
 
+=head3 HTTP::Engine
+
+Running an app on top of L<HTTP::Engine> is accomplished by using the
+L<Squatting::On::HTTP::Engine> module like this:
+
+  use App 'On::HTTP::Engine';
+  App->init;
+  App->http_engine(
+    interface => 'ServerSimple',
+    args      => {
+      host => 'localhost',
+      port => 2222,
+    }
+  )->run;
+
+Squatting::On::HTTP::Engine supports many other interfaces such as
+FCGI and ModPerl (for Apache 2.2 only), so please consult the docs for
+this module if this method of deployment interests you.
+
+=head3 Mojo
+
+TODO
+
+=head3 Jifty
+
+TODO
+
 =head3 Raw mod_perl1
 
+TODO
+
 =head3 Raw mod_perl2
+
+TODO
 
 =head3 HTML::Mason
 
@@ -476,11 +836,11 @@ and replace its layout method with your own.
   my $view = $App::Views::V[0];
   $view->{layout} = sub {
     my ($self, $v, $content) = @_;
-    # 
-    # make the layout look however you want
+    #
+    # Make the layout look however you want
     # using any templating system you want
-    # ( or none at all )
-    # and return a string
+    # ( or none at all ),
+    # and return a string that wraps $content
     #
   };
 
@@ -493,7 +853,11 @@ limiting.
 
 =head2 Reverse Proxying to Squatting+Continuity w/ Perlbal
 
+TODO
+
 =head2 Reverse Proxying to Squatting+Continuity w/ nginx
+
+TODO
 
 =head2 Piggy-Backing on Top of Other Frameworks
 
@@ -525,3 +889,14 @@ This is currently science fiction.
 
 
 =cut
+
+# Local Variables: ***
+# mode: cperl ***
+# indent-tabs-mode: nil ***
+# cperl-close-paren-offset: -2 ***
+# cperl-continued-statement-offset: 2 ***
+# cperl-indent-level: 2 ***
+# cperl-indent-parens-as-block: t ***
+# cperl-tab-always-indent: nil ***
+# End: ***
+# vim:tabstop=8 softtabstop=2 shiftwidth=2 shiftround expandtab

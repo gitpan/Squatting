@@ -6,7 +6,7 @@ WriteMakefile (
   LICENSE       => 'mit',
   VERSION_FROM  => 'lib/Squatting.pm',
   ABSTRACT_FROM => 'lib/Squatting.pm',
-  EXE_FILES     => [ 'bin/squatting', 'bin/vw' ],
+  EXE_FILES     => [ 'bin/squatting' ],
   PREREQ_PM     => {
     'Class::C3::Componentised' => 0,
     'HTTP::Daemon'             => 0,
@@ -14,6 +14,10 @@ WriteMakefile (
     'Data::Dump'               => 0,
     'JSON::XS'                 => 0,
     'Shell::Perl'              => 0,
+    'IO::All'                  => 0,
+    'Test::More'               => 0,
+    'HTTP::Response'           => 0,
+    'Clone'                    => 0,
   },
   depend => { distmeta => 'metamunge' }
 );

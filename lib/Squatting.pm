@@ -10,7 +10,7 @@ use List::Util qw(first);
 use URI::Escape;
 use Carp;
 
-our $VERSION = '0.52';
+our $VERSION = '0.60';
 
 require Squatting::Controller;
 require Squatting::View;
@@ -248,9 +248,9 @@ so much that I ported it to Perl.
 
 =item B<Tiny Codebase>
 
-The core of Squatting which includes Squatting, Squatting::Controller, and
-Squatting::View contains about 4.5K of code (after minifying).  Also, the
-number of Perl module dependencies has been kept down to a minimum.
+The core of Squatting (which includes Squatting, Squatting::Controller, and
+Squatting::View) can be squished into less than 4K of obfuscated perl.  Also,
+the number of Perl module dependencies has been kept down to a minimum.
 
 =item B<RESTful Controllers By Default>
 
@@ -261,12 +261,13 @@ delete().
 =item B<RESTless Controllers Are Possible>
 
 Stateful continuation-based code can be surprisingly useful (especially for
-COMET), so we try to make RESTless controllers easy to express as well. B<*>
+COMET), so we try to make RESTless controllers easy to express as well. (B<*>)
 
-=item B<Views Are ...Different>
+=item B<Squatting Apps Can Have Multiple Views>
 
-The View API feels like Camping, but Squatting allows multiple views to coexist
-(kinda like Catalyst (but not quite)).
+Views are also objects (not classes) whose methods represent templates to be
+rendered.  An app can also have more than one view.  Changing a Squatting app's
+look and feel can be as simple as swapping out one view object for another.
 
 =item B<Squatting Apps Are Composable>
 
@@ -279,27 +280,17 @@ it at an arbitrary path like /forum.
 
 Already using another framework?  No problem.  You should be able to embed
 Squatting apps into apps written in anything from CGI on up to Catalyst.
-B<Squatting is compatible with EVERYONE.>
+B<Squatting aims to be compatible with EVERYONE.>
 
 =item B<Minimal Policy>
 
-You may use any templating system you want, and you may use any ORM (B<**>) you
+You may use any templating system you want, and you may use any ORM you
 want.  We only have a few rules on how the controller code and the view code
 should be organized, but beyond that, you are free.
 
 =back
 
-B<*> RESTless controllers only work when you're using Continuity as your
-foundation.
-
-B<**> Regarding ORMs, the nature of Continuity (B<***>) makes it somewhat
-DBI-unfriendly, so this may be a deal-breaker for many of you.  However, I look
-at this as an opportunity to try novel storage systems like CouchDB, instead.
-With the high level of concurrency that Squatting can support (when using
-Continuity) we are probably better off this way.
-
-B<***> If you're not using Continuity, then really feel free to use any ORM.
-
+B<*> RESTless controllers currently only work when you're L<Squatting::On::Continuity>.
 
 =head1 API
 
@@ -323,6 +314,9 @@ this is the method you should override in your subclass.
 =head3 App->init
 
 This method takes no parameters and initializes some internal variables.
+
+B<NOTE>:  You can override this method if you want to do more things when
+the App is initialized.
 
 =head3 App->mount($AnotherApp, $prefix)
 
@@ -414,10 +408,17 @@ and embeddable.
 
 =item B<Other Squatting::* modules>:
 
-L<Squatting::Controller>, L<Squatting::View>, L<Squatting::Mapper>,
-L<Squatting::On::Continuity>, L<Squatting::On::Catalyst>, L<Squatting::On::CGI>
-L<Squatting::With::AccessTrace>,
+L<Squatting::Controller>, L<Squatting::View>,
+L<Squatting::Mapper>, L<Squatting::H>,
+L<Squatting::On::Continuity>, L<Squatting::On::Catalyst>, L<Squatting::On::CGI>,
+L<Squatting::On::MP13>, L<Squatting::On::MP20>,
+L<Squatting::With::AccessTrace>, L<Squatting::With::Log>,
+L<Squatting::With::Coro::Debug>
+
 L<Squatting::Cookbook>
+
+L<Squatting::On::HTTP::Engine>,
+L<Squatting::On::Mojo>
 
 =item B<Squatting's superclass>:
 
@@ -428,6 +429,13 @@ L<Class::C3::Componentised>
 L<Pod::Server>
 
 =back
+
+=head2 Google Group:  squatting-framework
+
+A Google Group has been setup so that people can discuss Squatting.
+If you have questions about the framework, this is the place to ask.
+
+L<http://groups.google.com/group/squatting-framework>
 
 =head2 Squatting Source Code
 
@@ -462,10 +470,10 @@ Combining coroutines with an event loop is a surprisingly powerful technique.
 
 =head2 Camping
 
-Squatting is the spiritual descendant of Camping, so studying the Camping API
+Squatting is descended from Camping, so studying the Camping API
 will indirectly teach you much of the Squatting API.
 
-L<http://code.whytheluckystiff.net/camping/>
+L<http://github.com/why/camping/tree/master>
 
 =head2 Prototype-based OO
 

@@ -5,9 +5,13 @@ no  strict 'refs';
 #use warnings;
 use Continuity;
 use Squatting::Mapper;
+use CGI::Cookie;
 
 # p for private  # this is my way of minimizing namespace pollution
 my %p;
+
+# session container
+our %state;
 
 # \%env = e($http_request)
 $p{e} = sub {
@@ -57,6 +61,11 @@ $p{init_cc} = sub {
   $cc->headers = { 'Content-Type' => 'text/html' };
   $cc->v       = {};
   $cc->status  = 200;
+  # setup session if one hasn't already been setup
+  my $sid = $cr->{session_id};
+  if (defined $sid) {
+    $cc->state = $state{$sid} ||= {};
+  }
   $cc;
 };
 

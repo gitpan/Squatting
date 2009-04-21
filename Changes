@@ -1,9 +1,36 @@
+Beyond (unreleased)
+  * give Squatting::Controller more awareness of Continuity.
+    Instead of $self->cr->next, what if we could say $self->next ?
+  * add proper support for file uploads wherever possible.
+    # I think adding an upload method to the controllers would work.
+  * do a better job of simulating requests in squatting -C
+  * BUG: POST -> perlbal -> thttpd -> Squatting::On::CGI == FAIL
+    Strangely enough, GET is fine.
+    Take perlbal out of the setup and everything is fine.
+  * implement Squatting::On::MP19
+  * implement Squatting::On::Jifty
+  * in Squatting::Controller's POD, teach people how to document controllers.
+  * in Squatting::View's POD, teach people how to document views.
+  * consider writing a module-starter plugin
+
 0.60 (unreleased)
   - More documentation updates and corrections.
-  * implement Squatting::On::HTTP::Engine
-  * implement Squatting::On::MP13
-  * implement Squatting::On::MP19
-  * implement Squatting::On::MP20
+  - Fixed URL for Tenjin in Squatting::Cookbook.
+  - Implemented Squatting::With::Log
+  - added --module parameter to bin/squatting
+  - added default in-memory session to Squatting::On::Continuity
+  - removed bin/vw from distribution, because it will be
+    distributed with App::VW from now on.
+  - worked around a weird bug where
+    Squatting::On::Catalyst + FastCGI
+    was using the wrong path.
+  - added support for nested %CONFIG vars in bin/squatting
+  - resurrected Squatting::H
+  - implemented Squatting::With::Coro::Debug
+  - implemented Squatting::On::MP13
+  - implemented Squatting::On::MP20
+  * fix the Tenjin example in the Cookbook
+  * finish L<Squatting::Cookbook/The Anatomy of a Squatting Application>
 
 0.52
   - More documentation updates and corrections
@@ -11,7 +38,7 @@
 
 0.51
   - implemented Squatting::On::CGI
-  - implement OpenID::Consumer example
+  - implemented OpenID::Consumer example
 
 0.50
   - More documentation updates and corrections.

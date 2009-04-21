@@ -65,3 +65,48 @@ squatting OpenID::Consumer -p 4239
   This example currently shows the bare minimum you need to implement
   an OpenID login.  It'll be improved as time goes on.
 
+______________________________________________________________________________
+squatting MicroWiki -p 4240
+
+  http://localhost:4240/
+
+  requires
+    Text::Textile
+    IO::All
+
+  metaperl from perlmonks.org wondered if a wiki could be implemented with
+  Squatting in 20 lines or less.  MicroWiki was my 17 line response.  It has
+  since been reduced to 11 lines.
+
+  http://perlmonks.org/?node_id=704372
+
+  If you find this unreadable, run it through perltidy.
+
+    perltidy < MicroWiki.pm
+
+______________________________________________________________________________
+squatting CouchWiki -p 4241
+
+  http://localhost:4241/
+
+  requires
+    Clone
+    HTML::AsSubs
+    Text::Textile
+    AnyEvent::CouchDB
+
+  I received an email from someone who wanted an example of how to use
+  AnyEvent in combination with Squatting and Continuity, so I ended up
+  creating CouchWiki.
+
+  * It started out as an unobfuscated MicroWiki.
+  * Then I switched to CouchDB for storage (instead of the filesystem).
+
+  After you've created a few pages through the browser, try doing this
+  in the shell:
+
+  $ squatting CouchWiki -C
+  > recent_changes
+  > page('Home')
+
+
