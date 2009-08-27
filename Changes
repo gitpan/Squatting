@@ -7,13 +7,31 @@ Beyond (unreleased)
   * BUG: POST -> perlbal -> thttpd -> Squatting::On::CGI == FAIL
     Strangely enough, GET is fine.
     Take perlbal out of the setup and everything is fine.
-  * implement Squatting::On::MP19
   * implement Squatting::On::Jifty
+  * implement Squatting::On::HTTP::Server::Simple
   * in Squatting::Controller's POD, teach people how to document controllers.
   * in Squatting::View's POD, teach people how to document views.
-  * consider writing a module-starter plugin
+  * consider writing a module-setup plugin
+  * fix the Tenjin example in the Cookbook
 
-0.60 (unreleased)
+0.70 2009-08-27
+  - reimplemented Squatting::With::Log using Squatting::H
+  - added Squatting::H->bless (breaking all the rules ;)
+  - changed Squatting::Mapper semantics
+    - $controller->{queue} has been deprecated in favor of
+      $controller->{continuity}
+    - Squatting::Mapper now dispatches on
+      $sid + $controller + $path
+      (in that order)
+      - It used to just be $sid + $controller,
+        but when people start opening multiple tabs,
+        that wasn't enough.  It was necessary to be
+        able to distinguish between the different tabs,
+        and putting something random at the end of a path
+        was one way to do that, so it's now the default.
+  - updated L<Squatting::Cookbook/The Anatomy of a Squatting Application>
+
+0.60 2009-04-21
   - More documentation updates and corrections.
   - Fixed URL for Tenjin in Squatting::Cookbook.
   - Implemented Squatting::With::Log
@@ -29,8 +47,6 @@ Beyond (unreleased)
   - implemented Squatting::With::Coro::Debug
   - implemented Squatting::On::MP13
   - implemented Squatting::On::MP20
-  * fix the Tenjin example in the Cookbook
-  * finish L<Squatting::Cookbook/The Anatomy of a Squatting Application>
 
 0.52
   - More documentation updates and corrections
