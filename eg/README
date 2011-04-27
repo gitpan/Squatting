@@ -84,6 +84,10 @@ squatting MicroWiki -p 4240
 
     perltidy < MicroWiki.pm
 
+  There's also a microwiki.psgi file that lets you run this wiki by typing:
+
+    plackup microwiki.psgi
+
 ______________________________________________________________________________
 squatting CouchWiki -p 4241
 
@@ -109,4 +113,15 @@ squatting CouchWiki -p 4241
   > recent_changes
   > page('Home')
 
+______________________________________________________________________________
+squatting HTTPAuth -p 4242
+
+  http://localhost:4242/
+
+  requires
+    MIME::Base64
+    HTML::AsSubs
+
+  This example shows you how to implement HTTP Basic Auth in Squatting.
+  http://en.wikipedia.org/wiki/Basic_access_authentication
 

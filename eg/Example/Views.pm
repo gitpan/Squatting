@@ -6,7 +6,6 @@ use warnings;
 use CGI ':standard';    # CGI.pm => DSLs since before they were cool.  ;-)
 use JSON::XS;
 use Data::Dump 'dump';
-use Squatting ':views';
 
 our %V;
 our @V = (
@@ -47,7 +46,7 @@ our @V = (
     profile => sub {
       my ($self, $v) = @_;
       h2("Profile of $v->{name}"),
-      p("$v->{name} is a fascinating person."),
+      p($v->{description}),
       h2("Special Hack"),
       p({-id => 'secret'}, $v->{_secret_from_json});
     },

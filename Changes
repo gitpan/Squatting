@@ -1,18 +1,36 @@
 Beyond (unreleased)
-  * give Squatting::Controller more awareness of Continuity.
-    Instead of $self->cr->next, what if we could say $self->next ?
-  * add proper support for file uploads wherever possible.
+  * add proper support for file uploads wherever possible.  #lack-of-maturity
     # I think adding an upload method to the controllers would work.
   * do a better job of simulating requests in squatting -C
   * BUG: POST -> perlbal -> thttpd -> Squatting::On::CGI == FAIL
     Strangely enough, GET is fine.
     Take perlbal out of the setup and everything is fine.
   * implement Squatting::On::Jifty
-  * implement Squatting::On::HTTP::Server::Simple
-  * in Squatting::Controller's POD, teach people how to document controllers.
-  * in Squatting::View's POD, teach people how to document views.
-  * consider writing a module-setup plugin
-  * fix the Tenjin example in the Cookbook
+  * implement Squatting::On::Squatting
+    * move mount method out of the core and into Squatting::With::Mount
+  * use Rhetoric and Pod::Server as examples of how to document a Squatting app.
+    * OLD: in Squatting::Controller's POD, teach people how to document controllers.
+    * OLD: in Squatting::View's POD, teach people how to document views.
+  * Make bin/squatting use Plack::Runner
+  * Things that would make Squatting easier to get started with:
+    - an app generator (using Module::Setup?)
+      - PSGI support by default
+  * Replace Shell::Perl with something based on Eval::WithLexicals.
+
+0.80 unreleased
+  - [ MAJOR API CHANGE! ]
+    - You don't say:  use base 'Squatting' anymore.
+    - When creating a Squatting app,
+      you just say:   use Squatting;
+    - You don't say:  use Squatting ':controllers' or
+                      use Squatting ':views' anymore
+    - use Squatting takes care of what those statements used to do.
+  - Squatting::H->merge renamed to Squatting::H->extend to
+    be consistent w/ the way these words are used in contemporary
+    Javascript libraries.
+  - Added Squatting::With::PerHostConfig
+  - hacked bin/squatting so that the console experience is a bit nicer.
+    App->get and App->post will work a tiny bit more reliably.
 
 0.70 2009-08-27
   - reimplemented Squatting::With::Log using Squatting::H

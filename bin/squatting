@@ -5,7 +5,7 @@ no  strict 'refs';
 use warnings;
 use lib 'lib';
 
-use Squatting;
+require Squatting;
 use Squatting::H;
 use Getopt::Long;
 use Data::Dump 'pp';
@@ -32,7 +32,7 @@ GetOptions(
 );
 
 sub help {
-  print "[(( Start a Squatting Application ))]
+  print "Squatting $Squatting::VERSION - launch a Squatting web application
 
 Usage: squatting [OPTIONS]... App
 
@@ -103,7 +103,7 @@ if ($app) {
     sub Squatting::Controller::mock_init {
       my $self = shift;
       $self->{cr}          = {}; # TODO - provide a mock Continuity::Request
-      $self->{env}         = { %ENV, REQUEST_PATH => &{"$app"."::Controllers::R"}($self->name, @_) };
+      $self->{env}         = { REQUEST_PATH => &{"$app"."::Controllers::R"}($self->name, @_) };
       $self->{cookies}     = {};
       $self->{input}       = {};
       $self->{headers}     = {};
@@ -111,10 +111,14 @@ if ($app) {
       $self->{status}      = 200;
       $self;
     };
-    foreach my $method qw(get post) {
+    foreach my $method qw(get post put delete) {
       *{$app."::$method" } = sub {
         my $cc = ${$app."::Controllers::C"}{$_[1]}->clone->mock_init(@_[2..$#_]);
-        my $content = $cc->$method(@_[2..$#_]);
+        $cc->env->{REQUEST_METHOD} = $method;
+        if (ref($_[-1]) eq 'HASH') {
+          $cc->input = pop @_;
+        }
+        my $content = $app->service($cc, @_[2..$#_]);
         ($cc, $content);
       };
     }

@@ -9,85 +9,80 @@ use base 'Class::C3::Componentised';
 use List::Util qw(first);
 use URI::Escape;
 use Carp;
+use Data::Dump 'pp';
 
-our $VERSION = '0.70';
+our $VERSION = '0.80';
 
 require Squatting::Controller;
 require Squatting::View;
 
-# use App ':controllers'
-# use App ':views'
+# XXX - deprecated | use App ':controllers'
+# XXX - deprecated | use App ':views'
 # use App @PLUGINS
+# 
+# No longer have to :  use base 'Squatting';
+# Simply saying     :  use Squatting;
+#   will muck with the calling packages @ISA.
 sub import {
-  my $m   = shift;
-  my $p   = (caller)[0];
-  my $app = $p;
-  $app =~ s/::Controllers$//;
-  $app =~ s/::Views$//;
+  my $m = shift;
+  my $p = (caller)[0];
+
+  if ($m ne 'Squatting') {
+    return $m->load_components(grep /::/, @_);
+  }
+
+  push @{$p.'::ISA'}, 'Squatting';
 
   # $url = R('Controller', @args, { cgi => vars })  # Generate URLs with the routing function
-  if (UNIVERSAL::isa($app, 'Squatting')) {
-    *{$p."::R"} = sub {
-      my ($controller, @args) = @_;
-      my $input;
-      if (@args && ref($args[-1]) eq 'HASH') {
-        $input = pop(@args);
-      }
-      my $c = ${$app."::Controllers::C"}{$controller};
-      croak "$controller controller not found" unless $c;
-      my $arity = @args;
-      my $path = first { my @m = /\(.*?\)/g; $arity == @m } @{$c->urls};
-      croak "couldn't find a matching URL path" unless $path;
-      while ($path =~ /\(.*?\)/) {
-        $path =~ s{\(.*?\)}{uri_escape(+shift(@args), "^A-Za-z0-9\-_.!~*’()/")}e;
-      }
-      if ($input) {
-        $path .= "?".  join('&' => 
-          map { 
-            my $k = $_;
-            ref($input->{$_}) eq 'ARRAY'
-              ? map { "$k=".uri_escape($_) } @{$input->{$_}}
-              : "$_=".uri_escape($input->{$_})
-          } keys %$input);
-      }
-      $path;
-    };
+  *{$p."::Controllers::R"} = *{$p."::Views::R"} = *{$p."::R"} = sub {
+    my ($controller, @args) = @_;
+    my $input;
+    if (@args && ref($args[-1]) eq 'HASH') {
+      $input = pop(@args);
+    }
+    my $c = ${$p."::Controllers::C"}{$controller};
+    croak "$controller controller not found in '\%$p\::Controllers::C" unless $c;
+    my $arity = @args;
+    my $path = first { my @m = /\(.*?\)/g; $arity == @m } @{$c->urls};
+    croak "couldn't find a matching URL path" unless $path;
+    while ($path =~ /\(.*?\)/) {
+      $path =~ s{\(.*?\)}{uri_escape(+shift(@args), "^A-Za-z0-9\-_.!~*’()/")}e;
+    }
+    if ($input) {
+      $path .= "?".  join('&' => 
+        map { 
+          my $k = $_;
+          ref($input->{$_}) eq 'ARRAY'
+            ? map { "$k=".uri_escape($_) } @{$input->{$_}}
+            : "$_=".uri_escape($input->{$_})
+        } keys %$input);
+    }
+    $path;
+  };
 
-    # ($controller, \@regex_captures) = D($path)  # Return controller and captures for a path
-    *{$app."::D"} = sub {
-      no warnings 'once';
-      my $url = uri_unescape($_[0]);
-      my $C = \@{$app.'::Controllers::C'};
-      my ($c, @regex_captures);
-      for $c (@$C) {
-        for (@{$c->urls}) {
-          if (@regex_captures = ($url =~ qr{^$_$})) {
-            pop @regex_captures if ($#+ == 0);
-            return ($c, \@regex_captures);
-          }
+  # ($controller, \@regex_captures) = D($path)  # Return controller and captures for a path
+  *{$p."::D"} = sub {
+    my $url = uri_unescape($_[0]);
+    my $C = \@{$p.'::Controllers::C'};
+    my ($c, @regex_captures);
+    for $c (@$C) {
+      for (@{$c->urls}) {
+        if (@regex_captures = ($url =~ qr{^$_$})) {
+          pop @regex_captures if ($#+ == 0);
+          return ($c, \@regex_captures);
         }
       }
-      ($Squatting::Controller::r404, []);
-    } unless exists ${$app."::"}{D};
-  }
-
-  my @c;
-  for (@_) {
-    if ($_ eq ':controllers') {
-      # $controller = C($name => \@urls, %subs)  # shortcut for constructing a Squatting::Controller
-      *{$p."::C"} = sub {
-        Squatting::Controller->new(@_, app => $app);
-      };
-    } elsif ($_ eq ':views') {
-      # $view = V($name, %subs)  # shortcut for constructing a Squatting::View
-      *{$p."::V"} = sub {
-        Squatting::View->new(@_);
-      };
-    } elsif (/::/) {
-      push @c, $_;
     }
-  }
-  $m->load_components(@c) if @c;
+    ($Squatting::Controller::r404, []);
+  };
+
+  *{$p."::Controllers::C"} = sub {
+    Squatting::Controller->new(@_, app => $p)
+  };
+  *{$p."::Views::V"} = sub {
+    Squatting::View->new(@_)
+  };
+
 }
 
 # Squatting plugins may be anywhere in Squatting::*::* but by convention
@@ -106,6 +101,7 @@ sub import {
 # (etc)
 sub component_base_class { __PACKAGE__ }
 
+# 1
 # App->mount($AnotherApp, $prefix)  # Map another app on to a URL $prefix.
 sub mount {
   my ($app, $other, $prefix) = @_;
@@ -117,6 +113,7 @@ sub mount {
   } @{$other."::Controllers::C"}
 }
 
+# 2
 # App->relocate($prefix)  # Map main app to a URL $prefix
 sub relocate {
   my ($app, $prefix) = @_;
@@ -124,18 +121,18 @@ sub relocate {
     my $urls = $_->urls;
     $_->urls = [ map { $prefix.$_ } @$urls ];
   }
+  ${$app."::CONFIG"}{relocated} = $prefix;
 }
 
+# 3
 # App->init  # Initialize $app
 sub init {
   $_->init for (@{$_[0]."::O"});
-  %{$_[0]."::Controllers::C"} = map { $_->name => $_ }
-  @{$_[0]."::Controllers::C"};
-  %{$_[0]."::Views::V"} = map { $_->name => $_ }
-  @{$_[0]."::Views::V"};
+  %{$_[0]."::Controllers::C"} = map { $_->name => $_ } @{$_[0]."::Controllers::C"};
+  %{$_[0]."::Views::V"}       = map { $_->name => $_ } @{$_[0]."::Views::V"};
 }
 
-# App->service($controller, @args)  # Handle one RESTful HTTP request
+# App->service($controller, @args)  # Handle an HTTP request
 sub service {
   my ($app, $c, @args) = grep { defined } @_;
   my $method = lc $c->env->{REQUEST_METHOD};
@@ -172,19 +169,16 @@ Check out our ASCII art logo:
 
 What a basic App looks like:
 
-  # STEP 1 => Subclass Squatting
+  # STEP 1 => Use Squatting for your App
   {
-    package App;
-    use base 'Squatting';
-    #use App::Controllers;
-    #use App::Views;
+    package App;  # <-- I hope it's obvious that this name can whatever you want.
+    use Squatting;
     our %CONFIG;  # <-- standard app config goes here
   }
 
-  # STEP 2 => Create a Controllers package
+  # STEP 2 => Define the App's Controllers
   {
     package App::Controllers;
-    use Squatting ':controllers';
 
     # Setup a list of controller objects in @C using the C() function.
     our @C = (
@@ -202,10 +196,9 @@ What a basic App looks like:
     );
   }
 
-  # STEP 3 => Create a Views package
+  # STEP 3 => Define the App's Views
   {
     package App::Views;
-    use Squatting ':views';
 
     # Setup a list of view objects in @V using the V() function.
     our @V = (
@@ -226,7 +219,7 @@ What a basic App looks like:
 
   # Models?  
   # - The whole world is your model.  ;-)
-  # - I've always been ambivalent about defining policy here.
+  # - I have no interest in defining policy here.
   # - Use whatever works for you.
 
 =head1 DESCRIPTION
@@ -286,7 +279,7 @@ B<Squatting aims to be compatible with EVERYONE.>
 
 You may use any templating system you want, and you may use any ORM you
 want.  We only have a few rules on how the controller code and the view code
-should be organized, but beyond that, you are free.
+should be organized, but beyond that, you are free as you want to be.
 
 =back
 
@@ -297,9 +290,21 @@ B<*> RESTless controllers currently only work when you're L<Squatting::On::Conti
 =head2 Use as a Base Class for Squatting Applications
 
   package App;
-  use base 'Squatting';
+  use Squatting;
   our %CONFIG = ();
   1;
+
+Just C<use>ing Squatting makes a lot of magic happen.  In the example above:
+
+=over 4
+
+=item App becomes a subclass of Squatting.
+
+=item App::Controllers is given this app's R() and C() functions.
+
+=item App::Views is given this app's R() and V() functions.
+
+=back
 
 =head3 App->service($controller, @args)
 
@@ -318,21 +323,29 @@ This method takes no parameters and initializes some internal variables.
 B<NOTE>:  You can override this method if you want to do more things when
 the App is initialized.
 
-=head3 App->mount($AnotherApp, $prefix)
+=head3 App->mount($AnotherApp => $prefix)
+
+XXX - The C<mount()> has been moved out of the core and into 
+L<Squatting::With::Mount>.  Furthermore, Squatting::With::Mount has
+been implemented using L<Squatting::On::Squatting>.
 
 This method will mount another Squatting app at the specified prefix.
 
-  App->mount('My::Blog',   '/my/ridiculous/rantings');
-  App->mount('Forum',      '/forum');
-  App->mount('ChatterBox', '/chat');
+  App->mount('My::Blog'   => '/my/ridiculous/rantings');
+  App->mount('Forum'      => '/forum');
+  App->mount('ChatterBox' => '/chat');
 
 B<NOTE>:  You can only mount an app once.  Don't try to mount it again
-at some other prefix, because it won't work.
+at some other prefix, because it won't work.  This is a consequence
+of storing so much information in package variables and a strong argument
+for going all objects all the time.
 
 =head3 App->relocate($prefix)
 
 This method will relocate a Squatting app to the specified prefix.  It's useful
 for embedding a Squatting app into apps written in other frameworks.
+
+This also has a side-effect of setting C<$CONFIG{relocated}> to C<$prefix>.
 
 =head2 Use as a Helper for Controllers
 
@@ -415,18 +428,20 @@ L<Squatting::On::MP13>, L<Squatting::On::MP20>,
 L<Squatting::With::AccessTrace>, L<Squatting::With::Log>,
 L<Squatting::With::Coro::Debug>
 
-L<Squatting::Cookbook>
-
-L<Squatting::On::HTTP::Engine>,
-L<Squatting::On::Mojo>
+L<Squatting::On::PSGI>,
+L<Squatting::On::Mojo>,
+L<Squatting::On::HTTP::Engine>
 
 =item B<Squatting's superclass>:
 
 L<Class::C3::Componentised>
 
-=item B<The first useful Squatting app released on CPAN>:
+=item B<Squatting apps you can find on CPAN>:
 
-L<Pod::Server>
+L<Pod::Server> - a nice way to browse through the POD for your locally
+installed perl modules.
+
+L<Stardust> - a simple COMET server.
 
 =back
 

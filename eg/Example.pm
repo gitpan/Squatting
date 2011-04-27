@@ -1,5 +1,5 @@
 package Example;
-use base 'Squatting';
+use Squatting;
 use Example::Controllers;
 use Example::Views;
 
