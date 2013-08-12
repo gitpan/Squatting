@@ -11,7 +11,7 @@ use URI::Escape;
 use Carp;
 use Data::Dump 'pp';
 
-our $VERSION = '0.81';
+our $VERSION = '0.82';
 
 require Squatting::Controller;
 require Squatting::View;
@@ -139,6 +139,7 @@ sub service {
   my $content;
 
   eval { $content = $c->$method(@args) };
+  die $@ if (ref($@) =~ /^HTTP::Exception/); # Pass HTTP::Exceptions on up
   warn "EXCEPTION: $@" if ($@);
 
   my $cookies = $c->cookies;
@@ -441,7 +442,9 @@ L<Class::C3::Componentised>
 L<Pod::Server> - a nice way to browse through the POD for your locally
 installed perl modules.
 
-L<Stardust> - a simple COMET server.
+L<Stardust> - a simple COMET server.  (DEPRECATED.  Use Web::Hippie or Plack::Middleware::SocketIO instead.)
+
+L<Rhetoric> - a simple CPAN-friendly blogging system for Perl.
 
 =back
 
