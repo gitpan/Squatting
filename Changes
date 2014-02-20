@@ -17,6 +17,9 @@ Beyond (unreleased)
       - PSGI support by default
   * Replace Shell::Perl with something based on Eval::WithLexicals.
 
+0.83 Wed Feb 19 19:13:33 PST 2014
+  - bin/squatting :: wrapped qw() in parens to avoid syntax warning
+
 0.82 2013-08-11
   - Squatting::With::PerHostConfig was removed, because I realized
     that it couldn't work the way I wanted it, too.  By the time
